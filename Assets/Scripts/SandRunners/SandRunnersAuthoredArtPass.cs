@@ -141,6 +141,9 @@ public partial class SandRunnersPrototype
 
     private void TryAttachPresentationWorldArt()
     {
+        EnsureAuthoredArtAssets();
+        AttachAuthoredBattlePyramid();
+
         if (battlePyramid != null && authoredApexArtPrefab != null &&
             battlePyramid.Find("SR_Authored_Apex_Art") == null)
         {
@@ -149,6 +152,7 @@ public partial class SandRunnersPrototype
             apex.transform.localPosition = new Vector3(0f, 3.1f, 0f);
             apex.transform.localRotation = Quaternion.identity;
             apex.transform.localScale = Vector3.one * 0.62f;
+            ConfigureAuthoredRuntimeLod(apex.transform);
         }
 
         AttachPresentationVisualToNamedRoot("Resource_Sand_Refinery_01", authoredResourceMinePrefab, "SR_Authored_Resource_Mine_Art", Vector3.one * 0.72f);
@@ -175,6 +179,7 @@ public partial class SandRunnersPrototype
         instance.transform.localPosition = Vector3.zero;
         instance.transform.localRotation = Quaternion.identity;
         instance.transform.localScale = scale;
+        ConfigureAuthoredRuntimeLod(instance.transform);
     }
 
     private void EnsureAuthoredArtAssets()
@@ -211,6 +216,7 @@ public partial class SandRunnersPrototype
         instance.transform.localPosition = new Vector3(0f, -0.02f, 0f);
         instance.transform.localRotation = Quaternion.identity;
         instance.transform.localScale = Vector3.one * 0.82f;
+        ConfigureAuthoredRuntimeLod(instance.transform);
     }
 
     private void AttachAuthoredMandarinkaPalace()
@@ -226,6 +232,7 @@ public partial class SandRunnersPrototype
         instance.transform.localPosition = Vector3.zero;
         instance.transform.localRotation = Quaternion.identity;
         instance.transform.localScale = Vector3.one * 0.92f;
+        ConfigureAuthoredRuntimeLod(instance.transform);
     }
 
     private void ApplyAuthoredGoldenVehicleArt(Transform root, string unitName, Vector3 gameplayScale)
@@ -265,6 +272,7 @@ public partial class SandRunnersPrototype
         instance.transform.localRotation = Quaternion.identity;
         float scale = Mathf.Clamp((gameplayScale.x + gameplayScale.z) * 0.26f, 0.58f, 1.02f);
         instance.transform.localScale = Vector3.one * scale;
+        ConfigureAuthoredRuntimeLod(instance.transform);
     }
 
     private void ApplyAuthoredImperialAssaultArt(Transform root)
@@ -282,6 +290,32 @@ public partial class SandRunnersPrototype
         instance.transform.localPosition = new Vector3(0f, -0.02f, 0f);
         instance.transform.localRotation = Quaternion.identity;
         instance.transform.localScale = Vector3.one * 0.55f;
+        ConfigureAuthoredRuntimeLod(instance.transform);
+    }
+
+    private static void ConfigureAuthoredRuntimeLod(Transform instance)
+    {
+        if (instance == null)
+            return;
+
+        LODGroup[] groups = instance.GetComponentsInChildren<LODGroup>(true);
+        for (int i = 0; i < groups.Length; i++)
+        {
+            LODGroup group = groups[i];
+            if (group == null)
+                continue;
+
+            LOD[] lods = group.GetLODs();
+            if (lods == null || lods.Length == 0)
+                continue;
+
+            int lastIndex = lods.Length - 1;
+            LOD last = lods[lastIndex];
+            last.screenRelativeTransitionHeight = Mathf.Min(last.screenRelativeTransitionHeight, 0.002f);
+            lods[lastIndex] = last;
+            group.SetLODs(lods);
+            group.RecalculateBounds();
+        }
     }
 
     private static void HideAuthoredReplacementRenderers(Transform root)

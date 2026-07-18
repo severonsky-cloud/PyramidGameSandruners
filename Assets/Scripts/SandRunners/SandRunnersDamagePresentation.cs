@@ -54,6 +54,7 @@ public partial class SandRunnersPrototype
     private readonly Queue<GameObject> salvagePiecePool = new Queue<GameObject>(72);
     private readonly HashSet<Transform> collapsedDamageRoots = new HashSet<Transform>();
     private readonly Dictionary<Transform, List<Renderer>> damageRenderers = new Dictionary<Transform, List<Renderer>>();
+    private readonly Dictionary<Renderer, bool> damageRendererBaseEnabled = new Dictionary<Renderer, bool>();
     private readonly Dictionary<Renderer, Color> damageBaseColors = new Dictionary<Renderer, Color>();
     private MaterialPropertyBlock damagePropertyBlock;
     private Material salvageDebrisMaterial;
@@ -116,6 +117,12 @@ public partial class SandRunnersPrototype
         {
             renderers = new List<Renderer>(root.GetComponentsInChildren<Renderer>(true));
             damageRenderers[root] = renderers;
+            for (int i = 0; i < renderers.Count; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer != null && !damageRendererBaseEnabled.ContainsKey(renderer))
+                    damageRendererBaseEnabled[renderer] = renderer.enabled;
+            }
         }
 
         float damage01 = 1f - health01;
@@ -126,8 +133,13 @@ public partial class SandRunnersPrototype
             if (renderer == null || renderer.sharedMaterial == null)
                 continue;
 
+            if (!damageRendererBaseEnabled.TryGetValue(renderer, out bool baseEnabled))
+            {
+                baseEnabled = renderer.enabled;
+                damageRendererBaseEnabled[renderer] = baseEnabled;
+            }
             if (health01 > 0.01f)
-                renderer.enabled = true;
+                renderer.enabled = baseEnabled;
 
             Material material = renderer.sharedMaterial;
             string colorProperty = material.HasProperty("_BaseColor") ? "_BaseColor" : material.HasProperty("_Color") ? "_Color" : null;
@@ -172,6 +184,11 @@ public partial class SandRunnersPrototype
                 name.Contains("balcony") || name.Contains("track") || name.Contains("wheel") || name.Contains("mast");
             if (!section)
                 continue;
+            if (damageRendererBaseEnabled.TryGetValue(renderer, out bool baseEnabled) && !baseEnabled)
+            {
+                renderer.enabled = false;
+                continue;
+            }
             bool broken = (health01 <= 0.62f && i % 4 == 0) || (health01 <= 0.38f && i % 2 == 0);
             renderer.enabled = !broken;
         }
