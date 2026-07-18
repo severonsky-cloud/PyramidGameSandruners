@@ -17,6 +17,22 @@ public partial class SandRunnersPrototype : MonoBehaviour
         Wind
     }
 
+    [System.Flags]
+    private enum UnitCapability
+    {
+        None = 0,
+        Flyer = 1 << 0,
+        Scarab = 1 << 1,
+        Heavy = 1 << 2,
+        Salvage = 1 << 3,
+        ResourceDeveloper = 1 << 4,
+        ScarabFortressDeveloper = 1 << 5,
+        FortressCrusherDeveloper = 1 << 6,
+        ThothBlessingDeveloper = 1 << 7,
+        FortressCrusherUnit = 1 << 8,
+        ThothUnit = 1 << 9
+    }
+
     private sealed class ResourceNode
     {
         public Transform transform;
@@ -53,6 +69,7 @@ public partial class SandRunnersPrototype : MonoBehaviour
         public bool isGradLauncher;
         public float secondaryFireCooldown;
         public int contractGroupId;
+        public UnitCapability capabilities;
     }
 
     private sealed class EnemyUnit
@@ -230,6 +247,19 @@ public partial class SandRunnersPrototype : MonoBehaviour
 
     private static bool startPlayingAfterSceneReload;
 
+    private enum StrategicUiEventKind
+    {
+        StrategicCanvasVisibility
+    }
+
+    private struct StrategicUiEvent
+    {
+        public StrategicUiEventKind kind;
+        public bool visible;
+    }
+
+    private event System.Action<StrategicUiEvent> strategicUiEvents;
+
     private SandRunnersGameFlowState gameFlowState = SandRunnersGameFlowState.MainMenu;
     private GUIStyle menuTitleStyle;
     private GUIStyle menuBodyStyle;
@@ -332,6 +362,7 @@ public partial class SandRunnersPrototype : MonoBehaviour
             HandleBuildInput();
             HandleGoldenEngineeringInput();
         }
+        UpdateResourceDevelopers(dt);
         UpdateRTSCore(dt);
         UpdateSpecialContractUnits(dt);
         if (!cinematicDirectorDriving)
@@ -784,6 +815,7 @@ public partial class SandRunnersPrototype : MonoBehaviour
         unit.airborne = airborne;
         unit.flightHeight = flightHeight;
         unit.autonomous = autonomous;
+        unit.capabilities = InferUnitCapabilities(name, unit.displayName, airborne);
         runners.Add(unit);
         RegisterRTSRunner(unit);
         return unit;
@@ -812,6 +844,33 @@ public partial class SandRunnersPrototype : MonoBehaviour
         if (objectName.Contains("Sand_Skimmer"))
             return "Sand Skimmer";
         return "Golden Vimana Runner";
+    }
+
+    private UnitCapability InferUnitCapabilities(string objectName, string displayName, bool airborne)
+    {
+        string objectKey = objectName ?? string.Empty;
+        string label = displayName ?? string.Empty;
+        UnitCapability capabilities = airborne ? UnitCapability.Flyer : UnitCapability.None;
+
+        if (objectKey.Contains("Scarab") || label.Contains("Scarab"))
+            capabilities |= UnitCapability.Scarab;
+        if (objectKey.Contains("Heavy") || objectKey.Contains("Wrath") || label.Contains("Heavy") || label.Contains("Wrath"))
+            capabilities |= UnitCapability.Heavy;
+        if (objectKey.Contains("Salvage") || objectKey.Contains("Harvester") || label.Contains("Salvage") || label.Contains("Harvester"))
+            capabilities |= UnitCapability.Salvage | UnitCapability.ResourceDeveloper;
+        if (objectKey.Contains("Scarab_Tank") || label.Contains("Scarab Tank"))
+            capabilities |= UnitCapability.ResourceDeveloper | UnitCapability.ScarabFortressDeveloper;
+        if (objectKey.Contains("Fortress_Crusher") || label.Contains("Fortress Crusher"))
+            capabilities |= UnitCapability.ResourceDeveloper | UnitCapability.FortressCrusherDeveloper | UnitCapability.FortressCrusherUnit | UnitCapability.Heavy;
+        if (objectKey.Contains("Thoth") || label.Contains("Thoth"))
+            capabilities |= UnitCapability.ResourceDeveloper | UnitCapability.ThothBlessingDeveloper | UnitCapability.ThothUnit | UnitCapability.Heavy;
+
+        return capabilities;
+    }
+
+    private bool HasCapability(RunnerUnit runner, UnitCapability capability)
+    {
+        return runner != null && (runner.capabilities & capability) == capability;
     }
 
     private void BuildGoldenVehicleVisual(Transform root, string name, Vector3 scale, Material material)
@@ -2540,6 +2599,15 @@ public partial class SandRunnersPrototype : MonoBehaviour
 
     private void InitializeGameFlow()
     {
+        if (SandRunnersSessionBootstrap.ConsumeStartMenuReturn())
+        {
+            startPlayingAfterSceneReload = false;
+            SetGameFlowState(SandRunnersGameFlowState.MainMenu);
+            if (!string.IsNullOrEmpty(SandRunnersSessionBootstrap.LastTransitionError))
+                lastEvent = "Startup returned to menu: " + SandRunnersSessionBootstrap.LastTransitionError;
+            return;
+        }
+
         if (startPlayingAfterSceneReload || SandRunnersSessionBootstrap.ConsumeRtsStart())
         {
             startPlayingAfterSceneReload = false;
@@ -2620,8 +2688,7 @@ public partial class SandRunnersPrototype : MonoBehaviour
         if (!playing)
             CloseUnifiedDiplomacy(false);
 
-        if (strategicCanvas != null)
-            strategicCanvas.gameObject.SetActive(playing && !hudHidden);
+        PublishStrategicUiEvent(StrategicUiEventKind.StrategicCanvasVisibility, playing && !hudHidden);
 
         if (state == SandRunnersGameFlowState.MainMenu)
             lastEvent = "Main menu. Start a new Sand runners battle.";
@@ -2727,7 +2794,7 @@ public partial class SandRunnersPrototype : MonoBehaviour
 
     private void DrawMainMenuGUI()
     {
-        Rect panel = CenterRect(720f, 490f);
+        Rect panel = CenterRect(720f, 548f);
         DrawPanelRect(panel, new Color(0.016f, 0.035f, 0.075f, 0.94f), new Color(1f, 0.76f, 0.23f, 1f));
         GUI.Label(new Rect(panel.x + 24f, panel.y + 28f, panel.width - 48f, 54f), "BATTLE FOR UNIVERSE", menuTitleStyle);
         GUI.Label(new Rect(panel.x + 24f, panel.y + 78f, panel.width - 48f, 34f), "Sand runners", menuTitleStyle);
@@ -2745,12 +2812,17 @@ public partial class SandRunnersPrototype : MonoBehaviour
             PlaySandRunnerSound(SandRunnerSound.UiConfirm, Vector3.zero, 0.6f);
             StartRtsWithoutPrologue();
         }
-        if (GUI.Button(new Rect(panel.x + 220f, panel.y + 350f, 280f, 44f), "QUIT PLAY", menuButtonStyle))
+        if (GUI.Button(new Rect(panel.x + 220f, panel.y + 350f, 280f, 44f), "DIRECT RTS", menuButtonStyle))
+        {
+            PlaySandRunnerSound(SandRunnerSound.UiConfirm, Vector3.zero, 0.6f);
+            StartDirectRtsFromMenu();
+        }
+        if (GUI.Button(new Rect(panel.x + 220f, panel.y + 406f, 280f, 44f), "QUIT PLAY", menuButtonStyle))
         {
             PlaySandRunnerSound(SandRunnerSound.UiButton, Vector3.zero, 0.5f);
             QuitPlayMode();
         }
-        GUI.Label(new Rect(panel.x + 72f, panel.y + 424f, panel.width - 144f, 34f), "Controls: Tab strategy, C follow selected, scroll zoom, Esc pause.", menuSmallStyle);
+        GUI.Label(new Rect(panel.x + 72f, panel.y + 480f, panel.width - 144f, 34f), "Controls: Tab strategy, C follow selected, scroll zoom, Esc pause.", menuSmallStyle);
     }
 
     private void DrawPauseMenuGUI()
@@ -2818,24 +2890,22 @@ public partial class SandRunnersPrototype : MonoBehaviour
 
     private void ReloadSceneForNewGame()
     {
-        SandRunnersSessionBootstrap.Reset();
-#if UNITY_EDITOR
-        UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(
-            "Assets/Scenes/SandRunners/SebekBedroomIntro.unity", new LoadSceneParameters(LoadSceneMode.Single));
-#else
-        SceneManager.LoadScene("SebekBedroomIntro");
-#endif
+        SandRunnersBootstrap.StartFullPrologue();
     }
 
     private void StartRtsWithoutPrologue()
     {
-        SandRunnersSessionBootstrap.RequestRtsStart(true);
-        ReloadCurrentScene(true);
+        SandRunnersBootstrap.StartSkippedPrologue();
+    }
+
+    private void StartDirectRtsFromMenu()
+    {
+        SandRunnersBootstrap.StartDirectRts();
     }
 
     private void ReloadSceneToMainMenu()
     {
-        ReloadCurrentScene(false);
+        SandRunnersBootstrap.ReturnToStartMenu();
     }
 
     private void ReloadCurrentScene(bool startPlaying)

@@ -91,6 +91,34 @@ public partial class SandRunnersPrototype
         PruneResourceDevelopmentOrders();
     }
 
+    private void UpdateResourceDevelopers(float dt)
+    {
+        List<GoldenBuilderAsset> builders = new List<GoldenBuilderAsset>(builderDevelopmentOrders.Keys);
+        for (int i = 0; i < builders.Count; i++)
+            UpdateResourceDeveloper(builders[i], dt);
+
+        List<RunnerUnit> assignedRunners = new List<RunnerUnit>(runnerDevelopmentOrders.Keys);
+        for (int i = 0; i < assignedRunners.Count; i++)
+            UpdateResourceDeveloper(assignedRunners[i], dt);
+
+        UpdateResourceDeveloper(touchOfHorus, dt);
+    }
+
+    private bool IsResourceDeveloperAssigned(GoldenBuilderAsset builder)
+    {
+        return builder != null && builderDevelopmentOrders.ContainsKey(builder);
+    }
+
+    private bool IsResourceDeveloperAssigned(RunnerUnit runner)
+    {
+        return runner != null && runnerDevelopmentOrders.ContainsKey(runner);
+    }
+
+    private bool IsResourceDeveloperAssigned(TouchOfHorusState horus)
+    {
+        return horus != null && horusDevelopmentOrder != null;
+    }
+
     private void EnsureResourceDevelopmentStates()
     {
         for (int i = 0; i < resourceNodes.Count; i++)
@@ -230,22 +258,22 @@ public partial class SandRunnersPrototype
         if (runner == null || runner.transform == null || runner.health <= 0f)
             return false;
 
-        if (runner.isSalvageScarab || runner.displayName.Contains("Salvage Scarab"))
+        if (runner.isSalvageScarab || HasCapability(runner, UnitCapability.Salvage))
         {
             kind = ResourceDevelopmentKind.SalvageHive;
             return true;
         }
-        if (runner.displayName.Contains("Scarab Tank"))
+        if (HasCapability(runner, UnitCapability.ScarabFortressDeveloper))
         {
             kind = ResourceDevelopmentKind.ScarabFortress;
             return true;
         }
-        if (runner.displayName.Contains("Fortress Crusher") && !runner.displayName.Contains("2.0"))
+        if (HasCapability(runner, UnitCapability.FortressCrusherDeveloper))
         {
             kind = ResourceDevelopmentKind.FortressCrusherAscension;
             return true;
         }
-        if (runner.displayName.Contains("Thoth") && !runner.displayName.Contains("Blessing"))
+        if (HasCapability(runner, UnitCapability.ThothBlessingDeveloper))
         {
             kind = ResourceDevelopmentKind.ThothBlessing;
             return true;
@@ -653,6 +681,7 @@ public partial class SandRunnersPrototype
     private void ApplyFortressCrusherAscension(ResourceNode node, RunnerUnit runner)
     {
         runner.displayName = "Fortress Crusher 2.0 // " + GetResourceKitName(node.kind);
+        runner.capabilities &= ~UnitCapability.FortressCrusherDeveloper;
         runner.maxHealth += node.kind == ResourceKind.Sand ? 420f : 260f;
         runner.health = runner.maxHealth;
         runner.damage += node.kind == ResourceKind.Gold ? 58f : 34f;
@@ -664,6 +693,7 @@ public partial class SandRunnersPrototype
     private void ApplyThothBlessing(ResourceNode node, RunnerUnit runner)
     {
         runner.displayName = "Blessing of Thoth // " + GetResourceKitName(node.kind);
+        runner.capabilities &= ~UnitCapability.ThothBlessingDeveloper;
         runner.maxHealth += node.kind == ResourceKind.Sand ? 520f : 340f;
         runner.health = runner.maxHealth;
         runner.damage += node.kind == ResourceKind.Gold ? 46f : 28f;

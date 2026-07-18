@@ -103,7 +103,7 @@ public partial class SandRunnersPrototype
             if (h.emitterBlockTimer <= 0f) h.blockedEmitters = 0;
         }
 
-        if (UpdateResourceDeveloper(h, dt))
+        if (IsResourceDeveloperAssigned(h))
         {
             AnimateTouchOfHorus(dt);
             UpdateHorusDust(dt);

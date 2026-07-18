@@ -255,10 +255,30 @@ public partial class SandRunnersPrototype
         strategicSelectionMaterial = CreateMaterial("Strategic Selection Blue", new Color(0.25f, 0.62f, 1f, 0.9f));
         SetEmission(strategicSelectionMaterial, new Color(0.15f, 0.5f, 1f, 1f), 1.5f);
         strategicCanvasReady = true;
+        strategicUiEvents -= HandleStrategicUiEvent;
+        strategicUiEvents += HandleStrategicUiEvent;
         InitializeThothCarrierUi();
         InitializeCurseHiveUi();
         InitializeVerticalSliceMissionUi();
         InitializeHorusDiplomacyUi();
+    }
+
+    private void PublishStrategicUiEvent(StrategicUiEventKind kind, bool visible)
+    {
+        System.Action<StrategicUiEvent> handler = strategicUiEvents;
+        if (handler == null)
+            return;
+
+        StrategicUiEvent uiEvent = new StrategicUiEvent();
+        uiEvent.kind = kind;
+        uiEvent.visible = visible;
+        handler(uiEvent);
+    }
+
+    private void HandleStrategicUiEvent(StrategicUiEvent uiEvent)
+    {
+        if (uiEvent.kind == StrategicUiEventKind.StrategicCanvasVisibility && strategicCanvas != null)
+            strategicCanvas.gameObject.SetActive(uiEvent.visible);
     }
 
     private void EnsureStrategicEventSystem()
@@ -989,10 +1009,10 @@ public partial class SandRunnersPrototype
             if (runner == null || runner.transform == null)
                 continue;
 
-            if ((group == "Flyer" && runner.displayName.Contains("Flyer")) ||
-                (group == "Scarab" && runner.displayName.Contains("Scarab")) ||
-                (group == "Heavy" && (runner.displayName.Contains("Heavy") || runner.displayName.Contains("Wrath"))) ||
-                (group == "Special" && (runner.displayName.Contains("Thoth") || runner.displayName.Contains("Crusher"))))
+            if ((group == "Flyer" && HasCapability(runner, UnitCapability.Flyer)) ||
+                (group == "Scarab" && HasCapability(runner, UnitCapability.Scarab)) ||
+                (group == "Heavy" && HasCapability(runner, UnitCapability.Heavy)) ||
+                (group == "Special" && (HasCapability(runner, UnitCapability.ThothUnit) || HasCapability(runner, UnitCapability.FortressCrusherUnit))))
             {
                 SelectStrategicTransform(runner.transform, runner.displayName);
                 return;
@@ -1113,7 +1133,7 @@ public partial class SandRunnersPrototype
         strategicSelectionRing.gameObject.SetActive(true);
         Vector3 position = selectedStrategicTransform.position;
         strategicSelectionRing.transform.position = new Vector3(position.x, GetPlayableGroundHeight(position) + 0.12f, position.z);
-        float radius = horus ? 7.5f : runner != null && runner.displayName.Contains("Thoth") ? 7.2f : runner != null && runner.displayName.Contains("Crusher") ? 4.2f : 2.7f;
+        float radius = horus ? 7.5f : HasCapability(runner, UnitCapability.ThothUnit) ? 7.2f : HasCapability(runner, UnitCapability.FortressCrusherUnit) ? 4.2f : 2.7f;
         strategicSelectionRing.transform.localScale = new Vector3(radius, 1f, radius);
         strategicSelectionRing.transform.rotation = Quaternion.Euler(0f, Time.time * 22f, 0f);
     }
