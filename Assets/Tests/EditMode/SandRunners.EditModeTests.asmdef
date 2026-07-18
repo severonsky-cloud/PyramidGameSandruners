@@ -1,0 +1,7 @@
+{
+  "name": "SandRunners.EditModeTests",
+  "references": [],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": true
+}
