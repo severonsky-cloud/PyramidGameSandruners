@@ -1,10 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Visual-only adapter for authored Scarab variants. Gameplay owns the root,
-/// collider, health and weapons. Art state is driven through explicit inputs.
-/// </summary>
 [DisallowMultipleComponent]
 public sealed class SandRunnersScarabArtAdapter : MonoBehaviour
 {
@@ -22,6 +18,8 @@ public sealed class SandRunnersScarabArtAdapter : MonoBehaviour
     private readonly List<Transform> salvageArmAnchors = new List<Transform>();
     private readonly List<Transform> walkerLegAnchors = new List<Transform>();
     private readonly List<Transform> carrierRotorAnchors = new List<Transform>();
+    private Transform cargoEmpty;
+    private Transform cargoLoaded;
     private Transform howitzerRecoilAnchor;
     private Vector3 howitzerRestPosition;
     private float clock;
@@ -58,6 +56,8 @@ public sealed class SandRunnersScarabArtAdapter : MonoBehaviour
         salvageArmAnchors.Clear();
         walkerLegAnchors.Clear();
         carrierRotorAnchors.Clear();
+        cargoEmpty = null;
+        cargoLoaded = null;
         howitzerRecoilAnchor = null;
 
         Transform[] all = GetComponentsInChildren<Transform>(true);
@@ -67,13 +67,17 @@ public sealed class SandRunnersScarabArtAdapter : MonoBehaviour
             string name = candidate.name.ToLowerInvariant();
             if (name.Contains("trackwheel") || name.Contains("track_roller") || name.Contains("wheel"))
                 wheelAnchors.Add(candidate);
-            if (name.Contains("salvage_arm") || name.Contains("manipulator"))
+            if (name.Contains("salvage_arm"))
                 salvageArmAnchors.Add(candidate);
             if (name.Contains("walker_leg"))
                 walkerLegAnchors.Add(candidate);
             if (name.Contains("carrier_rotor") || name.Contains("drone_rotor"))
                 carrierRotorAnchors.Add(candidate);
-            if (name == "muzzle_howitzer_recoil" || name == "howitzer_recoil_slide")
+            if (name == "salvage_cargo_empty_frame")
+                cargoEmpty = candidate;
+            if (name == "salvage_cargo_loaded")
+                cargoLoaded = candidate;
+            if (name == "howitzer_recoil_slide")
             {
                 howitzerRecoilAnchor = candidate;
                 howitzerRestPosition = candidate.localPosition;
@@ -86,6 +90,7 @@ public sealed class SandRunnersScarabArtAdapter : MonoBehaviour
         if (!cached) CacheAnchors();
         float dt = Mathf.Min(Time.deltaTime, 0.1f);
         clock += dt;
+
         float moving = state == ArtState.Moving ? motionInput : 0f;
         float salvaging = state == ArtState.Salvaging ? salvageInput : 0f;
         float firing = state == ArtState.Firing ? fireInput : 0f;
@@ -93,6 +98,7 @@ public sealed class SandRunnersScarabArtAdapter : MonoBehaviour
 
         AnimateWheels(moving, dt);
         AnimateSalvageArms(salvaging);
+        AnimateSalvageCargo(salvaging);
         AnimateWalkerLegs(moving);
         AnimateCarrierRotors(airborne, dt);
         AnimateHowitzer(firing);
@@ -111,10 +117,16 @@ public sealed class SandRunnersScarabArtAdapter : MonoBehaviour
         {
             Transform arm = salvageArmAnchors[i];
             if (arm == null) continue;
-            float side = i % 2 == 0 ? -1f : 1f;
-            float wave = Mathf.Sin(clock * 2.2f + i * 0.7f) * 6f * amount;
-            arm.localRotation = Quaternion.Euler(-18f - amount * 22f, side * (8f + amount * 18f), wave);
+            float phase = i * Mathf.PI * 0.34f;
+            float lift = Mathf.Sin(clock * 2.2f + phase) * 8f * amount;
+            arm.localRotation = Quaternion.Euler(-8f - amount * 24f, 0f, lift);
         }
+    }
+
+    private void AnimateSalvageCargo(float amount)
+    {
+        if (cargoEmpty != null) cargoEmpty.gameObject.SetActive(amount < 0.45f);
+        if (cargoLoaded != null) cargoLoaded.gameObject.SetActive(amount >= 0.45f);
     }
 
     private void AnimateWalkerLegs(float amount)
@@ -140,6 +152,6 @@ public sealed class SandRunnersScarabArtAdapter : MonoBehaviour
     {
         if (howitzerRecoilAnchor == null) return;
         float pulse = Mathf.Clamp01(amount) * (0.5f + Mathf.Abs(Mathf.Sin(clock * 18f)) * 0.5f);
-        howitzerRecoilAnchor.localPosition = howitzerRestPosition + Vector3.back * (0.22f * pulse);
+        howitzerRecoilAnchor.localPosition = howitzerRestPosition + Vector3.back * (0.32f * pulse);
     }
 }
