@@ -123,9 +123,12 @@ public partial class SandRunnersPrototype
         mandarinkaTerritoryRoot = new GameObject("SandRunners_Mandarinka_Territory_Runtime").transform;
         mandarinkaOccupations.Clear();
         mandarinkaResourceHoldings.Clear();
-        mandarinkaSandStock = 0f;
-        mandarinkaGoldStock = 0f;
-        mandarinkaWindStock = 0f;
+        // Finite palace reserve; sustained production requires captured nodes
+        // and their physical logistics convoys.
+        mandarinkaSandStock = 42f;
+        mandarinkaGoldStock = 36f;
+        mandarinkaWindStock = 28f;
+        mandarinkaSupply = 86f;
         mandarinkaCastleSandKit = false;
         mandarinkaCastleGoldKit = false;
         mandarinkaCastleWindKit = false;
@@ -204,8 +207,9 @@ public partial class SandRunnersPrototype
                 : 0f;
             bool reserved = CountMandarinkaBuildersAimingNear(node.transform.position, 18f) > 0;
             float playerInfluence = GetPlayerInfluenceAt(node.transform.position);
-            float score = SandRunnersOccupationRules.StrategicTargetScore(
-                76f + need * 48f + (node.controlled ? 18f : 0f), distance, 0f, playerInfluence, reserved);
+            float score = SandRunnersMandarinkaStrategicRules.TargetScore(
+                76f + need * 48f + (node.controlled ? 18f : 0f), 0.45f, distance, 0f,
+                playerInfluence, 1f - Mathf.Clamp01(playerInfluence / 220f), reserved);
             if (score > bestScore)
             {
                 bestScore = score;
@@ -233,8 +237,10 @@ public partial class SandRunnersPrototype
                 float value = 106f + state.cityTier * 16f + state.developmentPoints * 4f;
                 if (state.stage == SettlementDiplomacyStage.AlliedSettlement)
                     value += 28f;
-                float score = SandRunnersOccupationRules.StrategicTargetScore(
-                    value, distance, state.defenseLevel, GetPlayerInfluenceAt(position), reserved);
+                float influence = GetPlayerInfluenceAt(position);
+                float score = SandRunnersMandarinkaStrategicRules.TargetScore(
+                    value, occupation.captureProgress, distance, state.defenseLevel, influence,
+                    1f - Mathf.Clamp01(influence / 220f), reserved);
                 if (score > bestScore)
                 {
                     bestScore = score;
@@ -420,7 +426,6 @@ public partial class SandRunnersPrototype
         if (holding.node.markerRenderer != null)
             holding.node.markerRenderer.sharedMaterial = mandarinkaRedMaterial;
 
-        mandarinkaSupply = Mathf.Min(720f, mandarinkaSupply + 18f);
         PushLivingWorldEvent(LivingWorldEventType.Raid,
             "Mandarinka seized " + holding.node.label + " and raised an extraction outpost.", 12f, true);
         ShowBanner("RESOURCE LOST // " + holding.node.label.ToUpperInvariant(), 3f);
@@ -443,23 +448,7 @@ public partial class SandRunnersPrototype
 
             holding.node.controlled = false;
             holding.node.capture = 0f;
-            float income;
-            if (holding.node.kind == ResourceKind.Sand)
-            {
-                income = balanceProfile.mandarinkaSandExtractionPerSecond;
-                mandarinkaSandStock += income * dt;
-            }
-            else if (holding.node.kind == ResourceKind.Gold)
-            {
-                income = balanceProfile.mandarinkaGoldExtractionPerSecond;
-                mandarinkaGoldStock += income * dt;
-            }
-            else
-            {
-                income = balanceProfile.mandarinkaWindExtractionPerSecond;
-                mandarinkaWindStock += income * dt;
-            }
-            mandarinkaSupply = Mathf.Min(720f, mandarinkaSupply + income * 0.7f * dt);
+            // No direct stock ticks: a destroyed route must stop delivery.
             UpdateMandarinkaOutpostInfrastructure(holding, dt);
         }
     }
@@ -714,7 +703,7 @@ public partial class SandRunnersPrototype
         occupation.occupationAge = 0f;
         state.underRaid = false;
         state.settlement.health = Mathf.Max(state.settlement.health,
-            state.settlement.maxHealth * Mathf.Lerp(0.28f, 0.72f, occupation.population / 100f));
+            state.settlement.maxHealth * SandRunnersMandarinkaStrategicRules.LiberationRecovery(occupation.population));
         state.tradeTrust = Mathf.Min(100f, state.tradeTrust + 12f);
         state.playerInfluence = Mathf.Min(100f, state.playerInfluence + 16f);
         state.contractRestockTimer = Mathf.Min(state.contractRestockTimer, 90f);
@@ -802,19 +791,8 @@ public partial class SandRunnersPrototype
 
     private float GetMandarinkaTerritorySupplyRate()
     {
-        float rate = 0f;
-        foreach (KeyValuePair<ResourceNode, MandarinkaResourceHolding> pair in mandarinkaResourceHoldings)
-        {
-            MandarinkaResourceHolding holding = pair.Value;
-            if (holding == null || !holding.held || holding.node == null)
-                continue;
-            rate += holding.node.kind == ResourceKind.Sand ? 1.05f :
-                holding.node.kind == ResourceKind.Gold ? 0.9f : 0.68f;
-        }
-        rate += CountMandarinkaOccupiedSettlements() * 0.72f;
-        if (mandarinkaCastleGoldKit)
-            rate += 0.45f;
-        return rate;
+        // Supply arrives solely on convoy completion.
+        return 0f;
     }
 
     private float GetMandarinkaTerritoryProductionBonus()

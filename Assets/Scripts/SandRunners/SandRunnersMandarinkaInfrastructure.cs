@@ -45,6 +45,7 @@ public partial class SandRunnersPrototype
         public float travelSeconds;
         public float payload;
         public bool airborne;
+        public bool routeOperational;
     }
 
     private sealed class MandarinkaCastleMotion
@@ -307,6 +308,7 @@ public partial class SandRunnersPrototype
         convoy.holding = runtime.holding;
         convoy.kind = runtime.holding.node.kind;
         convoy.airborne = convoy.kind == ResourceKind.Wind;
+        convoy.routeOperational = runtime.holding.commandEnemy != null && runtime.holding.commandEnemy.health > 0f;
         convoy.start = runtime.holding.outpostRoot.position;
         convoy.end = mandarinkaFortressRoot.position;
         float distance = FlatDistance(convoy.start, convoy.end);
@@ -358,7 +360,10 @@ public partial class SandRunnersPrototype
         for (int i = mandarinkaLogisticsConvoys.Count - 1; i >= 0; i--)
         {
             MandarinkaLogisticsConvoy convoy = mandarinkaLogisticsConvoys[i];
-            if (convoy == null || convoy.root == null || convoy.enemy == null || convoy.enemy.health <= 0f)
+            if (convoy == null || convoy.root == null || convoy.enemy == null ||
+                !SandRunnersMandarinkaStrategicRules.CanDeliverLogistics(
+                    convoy.holding != null && convoy.holding.commandEnemy != null && convoy.holding.commandEnemy.health > 0f,
+                    convoy.routeOperational, convoy.enemy.health > 0f))
             {
                 if (convoy != null && convoy.root != null)
                     Destroy(convoy.root.gameObject);

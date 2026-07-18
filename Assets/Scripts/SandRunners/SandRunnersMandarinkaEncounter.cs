@@ -199,16 +199,7 @@ public partial class SandRunnersPrototype
 
     private float GetMandarinkaSupplyRate()
     {
-        float rate = 0.72f + mandarinkaFortressPhase * 0.22f + GetMandarinkaTerritorySupplyRate();
-        if (mandarinkaStrategyPhase == MandarinkaStrategyPhase.ScoutRaid)
-            rate += 0.18f;
-        else if (mandarinkaStrategyPhase == MandarinkaStrategyPhase.ResourceRaid)
-            rate += 0.3f;
-        else if (mandarinkaStrategyPhase == MandarinkaStrategyPhase.SiegeProbe)
-            rate += 0.42f;
-        else if (mandarinkaStrategyPhase == MandarinkaStrategyPhase.FortressAdvance)
-            rate += 0.55f;
-        return rate + GetMandarinkaTerritoryProductionBonus();
+        return GetMandarinkaTerritorySupplyRate();
     }
 
     private void LateUpdate()
@@ -591,11 +582,11 @@ public partial class SandRunnersPrototype
         int builderLimit = mandarinkaStrategyPhase == MandarinkaStrategyPhase.BuildUp ? 2 : Mathf.Clamp(3 + pressureTier / 3, 3, 5);
         int turretLimit = mandarinkaStrategyPhase < MandarinkaStrategyPhase.SiegeProbe ? 1 : 1 + mandarinkaFortressPhase + pressureTier / 2;
 
-        if (mandarinkaGroundTimer <= 0f && mandarinkaSupply >= 24f)
+        if (mandarinkaGroundTimer <= 0f && CanMandarinkaAfford(12f, 4f, 0f, 24f))
         {
             if (CountMandarinkaRole(MandarinkaRole.GroundCrawler) < groundLimit)
             {
-                mandarinkaSupply -= 24f;
+                SpendMandarinkaResources(12f, 4f, 0f, 24f);
                 mandarinkaGroundTimer = Mathf.Max(9f,
                     Random.Range(22f, 31f) - phaseIndex * 2.4f - pressureTier * 1.35f);
                 SpawnMandarinkaGroundCrawler();
@@ -606,11 +597,11 @@ public partial class SandRunnersPrototype
             }
         }
 
-        if (mandarinkaAirTimer <= 0f && mandarinkaSupply >= 38f)
+        if (mandarinkaAirTimer <= 0f && CanMandarinkaAfford(2f, 12f, 12f, 38f))
         {
             if (CountMandarinkaRole(MandarinkaRole.AirJunk) < airLimit)
             {
-                mandarinkaSupply -= 38f;
+                SpendMandarinkaResources(2f, 12f, 12f, 38f);
                 mandarinkaAirTimer = Mathf.Max(16f,
                     Random.Range(32f, 46f) - phaseIndex * 3.2f - pressureTier * 1.4f);
                 SpawnMandarinkaAirJunk();
@@ -621,16 +612,16 @@ public partial class SandRunnersPrototype
             }
         }
 
-        if (mandarinkaBuilderTimer <= 0f && CountMandarinkaRole(MandarinkaRole.Builder) < builderLimit && mandarinkaSupply >= 34f)
+        if (mandarinkaBuilderTimer <= 0f && CountMandarinkaRole(MandarinkaRole.Builder) < builderLimit && CanMandarinkaAfford(8f, 8f, 4f, 34f))
         {
-            mandarinkaSupply -= 34f;
+            SpendMandarinkaResources(8f, 8f, 4f, 34f);
             mandarinkaBuilderTimer = Random.Range(42f, 58f);
             SpawnMandarinkaBuilder();
         }
 
-        if (mandarinkaStrategyPhase >= MandarinkaStrategyPhase.SiegeProbe && mandarinkaGustavTimer <= 0f && CountMandarinkaRole(MandarinkaRole.Gustav) < 1 && mandarinkaSupply >= 126f)
+        if (mandarinkaStrategyPhase >= MandarinkaStrategyPhase.SiegeProbe && mandarinkaGustavTimer <= 0f && CountMandarinkaRole(MandarinkaRole.Gustav) < 1 && CanMandarinkaAfford(28f, 34f, 8f, 126f))
         {
-            mandarinkaSupply -= 126f;
+            SpendMandarinkaResources(28f, 34f, 8f, 126f);
             mandarinkaGustavTimer = Random.Range(85f, 110f);
             SpawnMandarinkaGustav();
         }
@@ -651,6 +642,20 @@ public partial class SandRunnersPrototype
         else if (mandarinkaStrategyPhase == MandarinkaStrategyPhase.FortressAdvance)
             rate += 0.55f;
         return rate;
+    }
+
+    private bool CanMandarinkaAfford(float sandCost, float goldCost, float windCost, float supplyCost)
+    {
+        return SandRunnersMandarinkaStrategicRules.CanAfford(mandarinkaSandStock, mandarinkaGoldStock,
+            mandarinkaWindStock, mandarinkaSupply, sandCost, goldCost, windCost, supplyCost);
+    }
+
+    private void SpendMandarinkaResources(float sandCost, float goldCost, float windCost, float supplyCost)
+    {
+        mandarinkaSandStock -= sandCost;
+        mandarinkaGoldStock -= goldCost;
+        mandarinkaWindStock -= windCost;
+        mandarinkaSupply -= supplyCost;
     }
 
     private void SpawnMandarinkaGroundCrawler()

@@ -254,20 +254,30 @@ public partial class SandRunnersPrototype
         int ground = CountMandarinkaRole(MandarinkaRole.GroundCrawler);
         int air = CountMandarinkaRole(MandarinkaRole.AirJunk);
         int artillery = CountMandarinkaRole(MandarinkaRole.Gustav);
-        MandarinkaAssaultStep next;
-
-        if (mandarinkaPriorityCluster == null)
-            next = MandarinkaAssaultStep.Recon;
-        else if (ground < 3 && mandarinkaAssaultStepTimer < balanceProfile.aiRallySeconds * 2f)
-            next = MandarinkaAssaultStep.Rally;
-        else if (artillery > 0 || mandarinkaFortressPhase > 0)
-            next = MandarinkaAssaultStep.Suppress;
-        else if (ground >= 3)
-            next = MandarinkaAssaultStep.Breach;
-        else if (air > 0)
-            next = MandarinkaAssaultStep.Exploit;
-        else
-            next = MandarinkaAssaultStep.Rally;
+        int mirrorTurrets = 0;
+        int counterBatteryTargets = 0;
+        if (mandarinkaPriorityCluster != null)
+        {
+            for (int i = 0; i < mandarinkaPriorityCluster.structures.Count; i++)
+            {
+                GoldenStructure structure = mandarinkaPriorityCluster.structures[i];
+                if (structure == null)
+                    continue;
+                if (structure.kind == StructureKind.MirrorBeamTurret)
+                    mirrorTurrets++;
+                if (structure.kind == StructureKind.AnubisStrikeLauncher || structure.kind == StructureKind.CruiseMissileSilo)
+                    counterBatteryTargets++;
+            }
+        }
+        bool settlementEncircled = CountMandarinkaOccupiedSettlements() > 0;
+        SandRunnersMandarinkaStrategicRules.AttackPhase phase =
+            SandRunnersMandarinkaStrategicRules.SelectAttackPhase(mandarinkaPriorityCluster != null ? 1f : 0f,
+                mirrorTurrets, counterBatteryTargets, artillery, ground, settlementEncircled);
+        MandarinkaAssaultStep next = phase == SandRunnersMandarinkaStrategicRules.AttackPhase.Recon ? MandarinkaAssaultStep.Recon :
+            phase == SandRunnersMandarinkaStrategicRules.AttackPhase.Suppression ? MandarinkaAssaultStep.Suppress :
+            phase == SandRunnersMandarinkaStrategicRules.AttackPhase.Breach ? MandarinkaAssaultStep.Breach :
+            phase == SandRunnersMandarinkaStrategicRules.AttackPhase.Exploitation ? MandarinkaAssaultStep.Exploit :
+            MandarinkaAssaultStep.Rally;
 
         if (next != mandarinkaAssaultStep)
         {
@@ -335,9 +345,32 @@ public partial class SandRunnersPrototype
 
     private bool CanMandarinkaFortressAdvance()
     {
-        if (cinematicDirectorActive)
-            return true;
-        return verticalSliceStage == VerticalSliceStage.DestroyMandarinka || verticalSliceStage == VerticalSliceStage.Complete;
+        bool missionAllowsAdvance = verticalSliceStage == VerticalSliceStage.DestroyMandarinka ||
+            verticalSliceStage == VerticalSliceStage.Complete;
+        return missionAllowsAdvance && SandRunnersMandarinkaStrategicRules.CastleMayAdvance(
+            GetMandarinkaForwardCoverage(), HasMandarinkaOperationalRoute(),
+            mandarinkaFortressPhase * 0.5f, mandarinkaPriorityCluster != null ? 0f : 1.2f);
+    }
+
+    private int GetMandarinkaForwardCoverage()
+    {
+        int coverage = 0;
+        foreach (KeyValuePair<ResourceNode, MandarinkaResourceHolding> pair in mandarinkaResourceHoldings)
+            if (pair.Value != null && pair.Value.held && pair.Value.commandEnemy != null && pair.Value.commandEnemy.health > 0f)
+                coverage++;
+        foreach (KeyValuePair<SettlementDevelopmentState, MandarinkaOccupation> pair in mandarinkaOccupations)
+            if (pair.Value != null && pair.Value.stage >= MandarinkaOccupationStage.Fortified &&
+                pair.Value.commandEnemy != null && pair.Value.commandEnemy.health > 0f)
+                coverage++;
+        return coverage;
+    }
+
+    private bool HasMandarinkaOperationalRoute()
+    {
+        foreach (KeyValuePair<ResourceNode, MandarinkaResourceHolding> pair in mandarinkaResourceHoldings)
+            if (pair.Value != null && pair.Value.held && pair.Value.commandEnemy != null && pair.Value.commandEnemy.health > 0f)
+                return true;
+        return false;
     }
 
     private void DamageMandarinkaTarget(GoldenStructure structure, float damage, Vector3 source)
