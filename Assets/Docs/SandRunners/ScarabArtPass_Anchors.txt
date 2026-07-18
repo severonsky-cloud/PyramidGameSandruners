@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!49 &4900000
+TextAsset:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ScarabArtPass_Anchors
+  m_Script: 'SandRunners Scarab Art Pass\nBASE COMMIT: a47e0c8f4d924a6788a4fb07d64731e57ab8a426\n\nVariants\nScarabTank:
+    tracked hull, no leg objects.\nSalvageScarab: cargo module and articulated salvage
+    arms.\nScarabWalker: high body and six articulated legs per side.\nScarabCarrierDrone:
+    airborne core, cargo pod and four rotor assemblies.\nScarabHowitzer: cursed heavy
+    casemate, recoil slide and oversized barrel.\n\nRuntime mapping\nScarab_Tank
+    -> SR_ScarabTank_Art\nSalvage_Scarab -> SR_SalvageScarab_Art\nScarab_Walker ->
+    SR_ScarabWalker_Art\nScarab_Carrier or Scarab_Drone -> SR_ScarabCarrierDrone_Art\nSiege_Scarab
+    or Scarab_Howitzer -> SR_ScarabHowitzer_Art\n\nCommon anchors under Scarab_Art_Anchors\nMuzzle_Main,
+    Muzzle_Left, Muzzle_Right, Muzzle_Howitzer_Recoil\nEngine_Main, Door_Cargo, Hardpoint_Main,
+    Hardpoint_Left, Hardpoint_Right\n\nLOD thresholds: 0.62 / 0.28 / 0.08.\nNo renderer.material
+    calls in the new adapter.\n'

@@ -6,6 +6,11 @@ public partial class SandRunnersPrototype
 {
     private GameObject authoredBattlePyramidPrefab;
     private GameObject authoredGoldenScarabPrefab;
+    private GameObject authoredScarabTankPrefab;
+    private GameObject authoredSalvageScarabPrefab;
+    private GameObject authoredScarabWalkerPrefab;
+    private GameObject authoredScarabCarrierPrefab;
+    private GameObject authoredScarabHowitzerPrefab;
     private GameObject authoredImperialAssaultPrefab;
     private GameObject authoredMandarinkaPalacePrefab;
     private bool authoredArtAssetsLoaded;
@@ -125,6 +130,11 @@ public partial class SandRunnersPrototype
         authoredArtAssetsLoaded = true;
         authoredBattlePyramidPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/SR_BattlePyramid_Authored");
         authoredGoldenScarabPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/SR_GoldenScarab_Authored");
+        authoredScarabTankPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/ScarabVariants/SR_ScarabTank_Art");
+        authoredSalvageScarabPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/ScarabVariants/SR_SalvageScarab_Art");
+        authoredScarabWalkerPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/ScarabVariants/SR_ScarabWalker_Art");
+        authoredScarabCarrierPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/ScarabVariants/SR_ScarabCarrierDrone_Art");
+        authoredScarabHowitzerPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/ScarabVariants/SR_ScarabHowitzer_Art");
         authoredImperialAssaultPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/SR_ImperialAssault_Authored");
         authoredMandarinkaPalacePrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/SR_MandarinkaPalace_Authored");
     }
@@ -165,12 +175,33 @@ public partial class SandRunnersPrototype
             return;
 
         EnsureAuthoredArtAssets();
-        if (authoredGoldenScarabPrefab == null || root.Find("SR_Authored_Golden_Scarab") != null)
+        if (authoredGoldenScarabPrefab == null || root.Find("SR_Authored_Golden_Scarab") != null || root.Find("SR_Authored_Scarab_Art") != null)
             return;
 
         HideAuthoredReplacementRenderers(root);
-        GameObject instance = Instantiate(authoredGoldenScarabPrefab, root);
-        instance.name = "SR_Authored_Golden_Scarab";
+        SandRunnersScarabArtAdapter.Variant variant = SandRunnersScarabArtAdapter.ResolveVariant(unitName);
+        GameObject selectedPrefab = authoredGoldenScarabPrefab;
+        switch (variant)
+        {
+            case SandRunnersScarabArtAdapter.Variant.Tank:
+                selectedPrefab = authoredScarabTankPrefab ?? authoredGoldenScarabPrefab;
+                break;
+            case SandRunnersScarabArtAdapter.Variant.Salvage:
+                selectedPrefab = authoredSalvageScarabPrefab ?? authoredGoldenScarabPrefab;
+                break;
+            case SandRunnersScarabArtAdapter.Variant.Walker:
+                selectedPrefab = authoredScarabWalkerPrefab ?? authoredGoldenScarabPrefab;
+                break;
+            case SandRunnersScarabArtAdapter.Variant.Carrier:
+                selectedPrefab = authoredScarabCarrierPrefab ?? authoredGoldenScarabPrefab;
+                break;
+            case SandRunnersScarabArtAdapter.Variant.Howitzer:
+                selectedPrefab = authoredScarabHowitzerPrefab ?? authoredGoldenScarabPrefab;
+                break;
+        }
+
+        GameObject instance = Instantiate(selectedPrefab, root);
+        instance.name = "SR_Authored_Scarab_Art";
         instance.transform.localPosition = Vector3.zero;
         instance.transform.localRotation = Quaternion.identity;
         float scale = Mathf.Clamp((gameplayScale.x + gameplayScale.z) * 0.26f, 0.58f, 1.02f);
