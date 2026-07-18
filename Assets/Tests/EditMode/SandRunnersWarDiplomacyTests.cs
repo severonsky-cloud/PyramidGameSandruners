@@ -130,6 +130,34 @@ public sealed class SandRunnersWarDiplomacyTests
         Invoke(bootstrap, "Reset");
     }
 
+    [Test]
+    public void SessionBootstrapTracksDirectRtsAndSafeMenuFallback()
+    {
+        Type session = RequireType("SandRunnersSessionBootstrap");
+        Type routeType = RequireType("SandRunnersBootstrapRoute");
+        Invoke(session, "Reset");
+
+        Invoke(session, "RequestDirectRtsStart");
+        Assert.That((bool)session.GetProperty("DirectRtsStart").GetValue(null), Is.True);
+        Assert.That(session.GetProperty("RequestedRoute").GetValue(null), Is.EqualTo(Enum.Parse(routeType, "DirectRts")));
+        Assert.That((bool)Invoke(session, "ConsumeRtsStart"), Is.True);
+        Assert.That((bool)Invoke(session, "ConsumeRtsStart"), Is.False);
+
+        Invoke(session, "RequestStartMenu", "broken transition");
+        Assert.That((bool)Invoke(session, "ConsumeStartMenuReturn"), Is.True);
+        Assert.That((string)session.GetProperty("LastTransitionError").GetValue(null), Is.EqualTo("broken transition"));
+        Assert.That((bool)Invoke(session, "ConsumeStartMenuReturn"), Is.False);
+        Invoke(session, "Reset");
+    }
+
+    [Test]
+    public void BootstrapSceneConstantsPointAtStartupScenes()
+    {
+        Type bootstrap = RequireType("SandRunnersBootstrap");
+        Assert.That((string)bootstrap.GetField("IntroScenePath").GetValue(null), Is.EqualTo("Assets/Scenes/SandRunners/SebekBedroomIntro.unity"));
+        Assert.That((string)bootstrap.GetField("RtsScenePath").GetValue(null), Is.EqualTo("Assets/Scenes/SampleScene.unity"));
+    }
+
     private static void AssertPrice(Type priceType, object price, float sand, float gold, float wind)
     {
         Assert.That((float)priceType.GetField("sand").GetValue(price), Is.EqualTo(sand));

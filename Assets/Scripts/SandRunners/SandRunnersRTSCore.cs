@@ -419,7 +419,7 @@ public partial class SandRunnersPrototype
         if (squad == null)
             return;
 
-        if (UpdateResourceDeveloper(runner, dt))
+        if (IsResourceDeveloperAssigned(runner))
             return;
 
         // Air wings are driven by the dedicated 3D sortie state machine.
@@ -460,7 +460,7 @@ public partial class SandRunnersPrototype
             RotateToward(runner.transform, toTarget, explicitAttack ? 360f * dt : 300f * dt);
             if (runner.fireCooldown <= 0f && distance <= runner.range)
             {
-                bool scarabWeapon = runner.displayName.Contains("Scarab");
+                bool scarabWeapon = HasCapability(runner, UnitCapability.Scarab);
                 runner.fireCooldown = explicitAttack ? (scarabWeapon ? 1.25f : 0.72f) : 0.95f;
                 target.health -= explicitAttack ? runner.damage : runner.damage * 0.75f;
                 TrackCombatTarget(target, explicitAttack ? (scarabWeapon ? "80-MM TARGET" : "SQUAD TARGET") : "DOCTRINE ENGAGE", explicitAttack ? 3.6f : 2.8f);
@@ -613,7 +613,7 @@ public partial class SandRunnersPrototype
         if (squad == null)
             return;
 
-        if (UpdateResourceDeveloper(builder, dt))
+        if (IsResourceDeveloperAssigned(builder))
             return;
 
         EnemyUnit threat = FindNearestEnemy(builder.transform.position, 28f);

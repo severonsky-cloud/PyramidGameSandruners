@@ -5,37 +5,52 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-[InitializeOnLoad]
 public static class SandRunnersBedroomIntroSceneBuilder
 {
     private const string ScenePath = "Assets/Scenes/SandRunners/SebekBedroomIntro.unity";
     private const string MaterialsFolder = "Assets/Resources/SandRunners/Materials/Intro";
-    private const string AutoBuildSessionKey = "SandRunners.SebekBedroomIntro.AutoBuild";
 
-    static SandRunnersBedroomIntroSceneBuilder()
+    [MenuItem("Sand Runners/Intro/Ensure Sebek Bedroom Intro Scene")]
+    public static void BuildFromMenu()
     {
-        EditorApplication.delayCall += AutoBuildIfMissing;
-        EditorApplication.delayCall += AutoAttachPinupPanels;
-        EditorApplication.delayCall += AutoAttachPlayableIntroRoute;
+        EnsureSceneFromMenu();
     }
 
-    [MenuItem("Sand Runners/Build Sebek Bedroom Intro Scene")]
-    public static void BuildFromMenu()
+    [MenuItem("Sand Runners/Intro/Rebuild Sebek Bedroom Intro Scene")]
+    public static void RebuildFromMenu()
     {
         BuildScene(true);
     }
 
-    private static void AutoBuildIfMissing()
+    private static void EnsureSceneFromMenu()
     {
         if (EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            Debug.LogWarning("Sebek bedroom intro generation skipped while Unity is entering or running Play Mode.");
             return;
-        if (SessionState.GetBool(AutoBuildSessionKey, false))
-            return;
-        if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) != null)
-            return;
+        }
 
-        SessionState.SetBool(AutoBuildSessionKey, true);
-        BuildScene(false);
+        if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) != null)
+        {
+            Scene scene = EditorSceneManager.GetSceneByPath(ScenePath);
+            if (!scene.IsValid() || !scene.isLoaded)
+                scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Additive);
+
+            if (EnsureLoadedSceneContent(scene))
+            {
+                EditorSceneManager.MarkSceneDirty(scene);
+                EditorSceneManager.SaveScene(scene);
+                AssetDatabase.Refresh();
+                Debug.Log("Sebek bedroom intro scene updated manually at " + ScenePath + ".");
+            }
+            else
+            {
+                Debug.Log("Sebek bedroom intro scene is already up to date.");
+            }
+            return;
+        }
+
+        BuildScene(true);
     }
 
     private static void BuildScene(bool force)
@@ -96,82 +111,77 @@ public static class SandRunnersBedroomIntroSceneBuilder
         Debug.Log("Built Sebek bedroom intro scene at " + ScenePath + (force ? " via menu." : " automatically."));
     }
 
-    private static void AutoAttachPinupPanels()
+    private static bool EnsureLoadedSceneContent(Scene scene)
     {
-        if (EditorApplication.isPlayingOrWillChangePlaymode)
-            return;
-
-        Scene scene = EditorSceneManager.GetSceneByPath(ScenePath);
         if (!scene.IsValid() || !scene.isLoaded)
-            return;
+            return false;
 
         GameObject root = FindRootGameObject(scene, "Sebek_Bedroom_Intro_Blockout");
-        if (root == null || root.transform.Find("Sebek_Pinup_Art_Panels") != null)
-            return;
+        if (root == null)
+            return false;
 
         EnsureFolder("Assets/Resources");
         EnsureFolder("Assets/Resources/SandRunners");
         EnsureFolder("Assets/Resources/SandRunners/Materials");
         EnsureFolder(MaterialsFolder);
 
-        Material frameMaterial = MaterialAsset("Intro Dark Bronze Trim", new Color(0.09f, 0.075f, 0.06f, 1f), 0.5f, 0.32f);
-        int created = BuildPinupGallery(root.transform, frameMaterial);
-        EnsureGalleryOverlay(scene);
-        if (created <= 0)
-            return;
-
-        EditorSceneManager.MarkSceneDirty(scene);
-        EditorSceneManager.SaveScene(scene);
-        Debug.Log("Attached " + created + " Sebek framed art panels to " + ScenePath + ".");
-    }
-
-    private static void AutoAttachPlayableIntroRoute()
-    {
-        if (EditorApplication.isPlayingOrWillChangePlaymode)
-            return;
-
-        Scene scene = EditorSceneManager.GetSceneByPath(ScenePath);
-        if (!scene.IsValid() || !scene.isLoaded)
-            return;
-
-        GameObject root = FindRootGameObject(scene, "Sebek_Bedroom_Intro_Blockout");
-        if (root == null || root.transform.Find("Sebek_Pyramid_Intro_Route") != null)
+        bool changed = false;
+        if (root.transform.Find("Sebek_Pinup_Art_Panels") == null)
         {
-            EnsureControllerHasAllInteractables(scene);
-            return;
+            Material frameMaterial = MaterialAsset("Intro Dark Bronze Trim", new Color(0.09f, 0.075f, 0.06f, 1f), 0.5f, 0.32f);
+            changed |= BuildPinupGallery(root.transform, frameMaterial) > 0;
+            changed |= EnsureGalleryOverlay(scene);
         }
 
-        EnsureFolder("Assets/Resources");
-        EnsureFolder("Assets/Resources/SandRunners");
-        EnsureFolder("Assets/Resources/SandRunners/Materials");
-        EnsureFolder(MaterialsFolder);
+        if (root.transform.Find("Sebek_Pyramid_Intro_Route") == null)
+        {
+            Material floorMaterial = MaterialAsset("Intro Polished Gold Floor", new Color(0.52f, 0.38f, 0.18f, 1f), 0.45f, 0.62f);
+            Material wallMaterial = MaterialAsset("Intro Warm Stone Wall", new Color(0.36f, 0.31f, 0.25f, 1f), 0.05f, 0.38f);
+            Material darkMaterial = MaterialAsset("Intro Dark Bronze Trim", new Color(0.09f, 0.075f, 0.06f, 1f), 0.5f, 0.32f);
+            Material mirrorMaterial = MaterialAsset("Intro Soft Mirror", new Color(0.55f, 0.68f, 0.72f, 0.72f), 0.2f, 0.95f, true, new Color(0.07f, 0.2f, 0.24f, 1f), 0.35f);
+            Material radioGlowMaterial = MaterialAsset("Intro Radio Warning Light", new Color(0.55f, 0.04f, 0.02f, 1f), 0f, 0.5f, false, new Color(1f, 0.12f, 0.04f, 1f), 1.5f);
+            changed |= BuildPlayableIntroRoute(root.transform, floorMaterial, wallMaterial, darkMaterial, mirrorMaterial, radioGlowMaterial).Length > 0;
+        }
 
-        Material floorMaterial = MaterialAsset("Intro Polished Gold Floor", new Color(0.52f, 0.38f, 0.18f, 1f), 0.45f, 0.62f);
-        Material wallMaterial = MaterialAsset("Intro Warm Stone Wall", new Color(0.36f, 0.31f, 0.25f, 1f), 0.05f, 0.38f);
-        Material darkMaterial = MaterialAsset("Intro Dark Bronze Trim", new Color(0.09f, 0.075f, 0.06f, 1f), 0.5f, 0.32f);
-        Material mirrorMaterial = MaterialAsset("Intro Soft Mirror", new Color(0.55f, 0.68f, 0.72f, 0.72f), 0.2f, 0.95f, true, new Color(0.07f, 0.2f, 0.24f, 1f), 0.35f);
-        Material radioGlowMaterial = MaterialAsset("Intro Radio Warning Light", new Color(0.55f, 0.04f, 0.02f, 1f), 0f, 0.5f, false, new Color(1f, 0.12f, 0.04f, 1f), 1.5f);
-
-        int created = BuildPlayableIntroRoute(root.transform, floorMaterial, wallMaterial, darkMaterial, mirrorMaterial, radioGlowMaterial).Length;
-        EnsureControllerHasAllInteractables(scene);
-        EditorSceneManager.MarkSceneDirty(scene);
-        EditorSceneManager.SaveScene(scene);
-        Debug.Log("Attached playable pyramid intro route to " + ScenePath + " with " + created + " route interactables.");
+        changed |= EnsureControllerHasAllInteractables(scene);
+        return changed;
     }
 
-    private static void EnsureControllerHasAllInteractables(Scene scene)
+    private static bool EnsureControllerHasAllInteractables(Scene scene)
     {
         GameObject controllerObject = FindRootGameObject(scene, "Sebek_Bedroom_Intro_Controller");
         if (controllerObject == null)
-            return;
+            return false;
 
         SebekBedroomIntroController controller = controllerObject.GetComponent<SebekBedroomIntroController>();
         if (controller == null)
-            return;
+            return false;
 
-        controller.interactables = Object.FindObjectsByType<SebekBedroomInteractable>(FindObjectsSortMode.None);
+        List<SebekBedroomInteractable> sceneInteractables = new List<SebekBedroomInteractable>();
+        GameObject[] roots = scene.GetRootGameObjects();
+        for (int i = 0; i < roots.Length; i++)
+            roots[i].GetComponentsInChildren(true, sceneInteractables);
+
+        bool changed = controller.interactables == null || controller.interactables.Length != sceneInteractables.Count;
+        if (!changed)
+        {
+            for (int i = 0; i < sceneInteractables.Count; i++)
+            {
+                if (controller.interactables[i] != sceneInteractables[i])
+                {
+                    changed = true;
+                    break;
+                }
+            }
+        }
+
+        if (!changed)
+            return false;
+
+        controller.interactables = sceneInteractables.ToArray();
         ConfigureIntroControllerBounds(controller);
         EditorUtility.SetDirty(controller);
+        return true;
     }
 
     private static void ConfigureIntroControllerBounds(SebekBedroomIntroController controller)
@@ -184,14 +194,14 @@ public static class SandRunnersBedroomIntroSceneBuilder
         controller.corridorBackLimit = -17.25f;
     }
 
-    private static void EnsureGalleryOverlay(Scene scene)
+    private static bool EnsureGalleryOverlay(Scene scene)
     {
         GameObject controllerObject = FindRootGameObject(scene, "Sebek_Bedroom_Intro_Controller");
         if (controllerObject == null || controllerObject.GetComponent<SebekPinupGalleryOverlay>() != null)
-            return;
+            return false;
 
         controllerObject.AddComponent<SebekPinupGalleryOverlay>();
-        EditorSceneManager.MarkSceneDirty(scene);
+        return true;
     }
 
     private static GameObject FindRootGameObject(Scene scene, string name)

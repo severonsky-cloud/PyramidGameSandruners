@@ -298,7 +298,16 @@ public sealed class SebekBedroomIntroController : MonoBehaviour
 
     private void CacheInteractables()
     {
-        interactables = FindObjectsByType<SebekBedroomInteractable>(FindObjectsInactive.Exclude);
+        List<SebekBedroomInteractable> sceneInteractables = new List<SebekBedroomInteractable>();
+        Scene scene = gameObject.scene;
+        if (scene.IsValid())
+        {
+            GameObject[] roots = scene.GetRootGameObjects();
+            for (int i = 0; i < roots.Length; i++)
+                roots[i].GetComponentsInChildren(false, sceneInteractables);
+        }
+
+        interactables = sceneInteractables.ToArray();
     }
 
     private void ConfigureSebekVisual()
@@ -939,13 +948,7 @@ public sealed class SebekBedroomIntroController : MonoBehaviour
 
     private void CompletePrologueAndLoadRts()
     {
-        SandRunnersSessionBootstrap.RequestRtsStart(false);
-#if UNITY_EDITOR
-        UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(
-            "Assets/Scenes/SampleScene.unity", new LoadSceneParameters(LoadSceneMode.Single));
-#else
-        SceneManager.LoadScene("SampleScene");
-#endif
+        SandRunnersBootstrap.StartRtsAfterCompletedPrologue();
     }
 
     private void SkipPrologue()
@@ -953,13 +956,7 @@ public sealed class SebekBedroomIntroController : MonoBehaviour
         if (prisonerTransitionStarted)
             return;
         prisonerTransitionStarted = true;
-        SandRunnersSessionBootstrap.RequestRtsStart(true);
-#if UNITY_EDITOR
-        UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(
-            "Assets/Scenes/SampleScene.unity", new LoadSceneParameters(LoadSceneMode.Single));
-#else
-        SceneManager.LoadScene("SampleScene");
-#endif
+        SandRunnersBootstrap.StartSkippedPrologue();
     }
 
     private void OpenBedroomExit()
