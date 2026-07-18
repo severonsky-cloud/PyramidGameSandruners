@@ -52,7 +52,7 @@ public partial class SandRunnersPrototype
     private DiplomacyTab diplomacyTab;
     private SettlementDevelopmentState activeDiplomacyState;
     private ResourceKind diplomacyGiftResource;
-    private float diplomacyPreviousTimeScale = 1f;
+    private readonly SandRunnersDiplomacyPanelController diplomacyPanelController = new SandRunnersDiplomacyPanelController();
     private float diplomacyLastPyramidHull;
     private float diplomacyLastSettlementHealth;
     private GameObject unifiedDiplomacyPanelObject;
@@ -129,7 +129,7 @@ public partial class SandRunnersPrototype
             InitializeUnifiedDiplomacy();
 
         UpdateFactionContractRestocks(dt);
-        SettlementDevelopmentState nearest = battlePyramid != null ? FindNearestSettlementDevelopment(battlePyramid.position, 220f) : null;
+        SettlementDevelopmentState nearest = battlePyramid != null ? FindNearestSettlementDevelopment(battlePyramid.position, SandRunnersDiplomacyPanelState.OpenRadius) : null;
         if (nearest != null && nearest.settlement != null && diplomacyHintSettlement != nearest.settlement)
         {
             diplomacyHintSettlement = nearest.settlement;
@@ -156,7 +156,7 @@ public partial class SandRunnersPrototype
         if (activeDiplomacyState == null || activeDiplomacyState.settlement == null ||
             activeDiplomacyState.settlement.root == null || activeDiplomacyState.settlement.health <= 0f ||
             IsSettlementUnavailableToPlayer(activeDiplomacyState) ||
-            battlePyramid == null || FlatDistance(battlePyramid.position, activeDiplomacyState.settlement.root.position) > 240f ||
+            battlePyramid == null || FlatDistance(battlePyramid.position, activeDiplomacyState.settlement.root.position) > SandRunnersDiplomacyPanelState.CloseRadius ||
             gameFlowState != SandRunnersGameFlowState.Playing || hudHidden)
         {
             CloseUnifiedDiplomacy(false);
@@ -183,7 +183,7 @@ public partial class SandRunnersPrototype
             return;
         activeDiplomacyState = state;
         unifiedDiplomacyOpen = true;
-        diplomacyPreviousTimeScale = Mathf.Max(0.01f, Time.timeScale);
+        diplomacyPanelController.Open(Time.timeScale);
         Time.timeScale = Mathf.Clamp(balanceProfile.diplomacyTimeScale, 0.05f, 1f);
         diplomacyLastPyramidHull = pyramidHull;
         diplomacyLastSettlementHealth = state.settlement.health;
@@ -195,12 +195,12 @@ public partial class SandRunnersPrototype
 
     private void CloseUnifiedDiplomacy(bool playSound)
     {
-        if (!unifiedDiplomacyOpen)
+        if (!unifiedDiplomacyOpen && !diplomacyPanelController.IsOpen)
             return;
         unifiedDiplomacyOpen = false;
         if (unifiedDiplomacyPanelObject != null)
             unifiedDiplomacyPanelObject.SetActive(false);
-        Time.timeScale = diplomacyPreviousTimeScale > 0f ? diplomacyPreviousTimeScale : 1f;
+        Time.timeScale = diplomacyPanelController.Close(Time.timeScale);
         if (playSound)
             PlaySandRunnerSound(SandRunnerSound.UiConfirm, battlePyramid != null ? battlePyramid.position : Vector3.zero, 0.45f);
         activeDiplomacyState = null;
@@ -220,8 +220,9 @@ public partial class SandRunnersPrototype
 
         string settlementName = hasState ? activeDiplomacyState.settlement.displayName : "SETTLEMENT CHANNEL";
         diplomacyTitleText.text = settlementName;
+        SandRunnersDiplomacyPanelState panelState = hasState ? BuildDiplomacyPanelState(activeDiplomacyState, null) : null;
         diplomacyRelationText.text = hasState
-            ? activeDiplomacyState.stage + "  //  TRUST " + Mathf.RoundToInt(activeDiplomacyState.tradeTrust) +
+            ? panelState.Stage + "  //  TRUST " + Mathf.RoundToInt(activeDiplomacyState.tradeTrust) +
               "  //  INFLUENCE " + Mathf.RoundToInt(activeDiplomacyState.playerInfluence) +
               "  //  DEALS " + activeDiplomacyState.playerDeals +
               "  //  " + (activeDiplomacyState.horusPower ? "HORUS GRID" :
@@ -251,24 +252,21 @@ public partial class SandRunnersPrototype
             SetButtonText(diplomacyGiftResourceButton, "RESOURCE: " + diplomacyGiftResource.ToString().ToUpperInvariant());
         }
         else if (diplomacyTab == DiplomacyTab.Trade)
-            diplomacyBodyText.text = "The standard contract develops the settlement, raises its defenses and advances the diplomatic relationship.";
+            diplomacyBodyText.text = "DEVELOPMENT TRADE // 35 SAND / 25 GOLD / 8 WIND\n" + panelState.NextStageRequirement +
+                "\nInteraction: " + Mathf.RoundToInt(panelState.Distance) + "m / " + Mathf.RoundToInt(SandRunnersDiplomacyPanelState.OpenRadius) + "m open; panel holds until " + Mathf.RoundToInt(SandRunnersDiplomacyPanelState.CloseRadius) + "m.";
         else
         {
             FactionContractOffer offer = GetFactionContractOffer(activeDiplomacyState);
-            bool allied = activeDiplomacyState.stage == SettlementDiplomacyStage.AlliedSettlement;
+            panelState = BuildDiplomacyPanelState(activeDiplomacyState, offer);
             diplomacyBodyText.text = offer == null
                 ? "This faction has no military contract in the current slice."
-                : allied
-                    ? "Alliance stock is limited. Purchased forces remain yours even if the settlement is later lost."
-                    : "SPECIAL CONTRACT LOCKED // Need 4 development trades, 60 trust, 60 influence and an online mirror or Horus grid. Current: " +
-                      activeDiplomacyState.playerDeals + "/4 deals, " +
-                      Mathf.RoundToInt(activeDiplomacyState.tradeTrust) + "/60 trust, " +
-                      Mathf.RoundToInt(activeDiplomacyState.playerInfluence) + "/60 influence.";
+                : "Purchased forces remain yours if this settlement is later occupied or destroyed.\n" +
+                  panelState.NextStageRequirement + "\n" + panelState.ContractPrice + " // " + panelState.StockStatus + "\n" + panelState.BlockReason;
             if (offer != null)
             {
-                string stock = activeDiplomacyState.contractStock > 0 ? "IN STOCK" : "RESTOCK " + Mathf.CeilToInt(activeDiplomacyState.contractRestockTimer) + "s";
                 SetButtonText(diplomacyContractButton, offer.label + " x" + offer.unitCount + "\n" +
-                    Mathf.RoundToInt(offer.price.sand) + " S / " + Mathf.RoundToInt(offer.price.gold) + " G / " + Mathf.RoundToInt(offer.price.wind) + " W // " + stock);
+                    panelState.ContractPrice + " // " + panelState.StockStatus + "\n" + panelState.BlockReason);
+                SetDiplomacyButtonAvailable(diplomacyContractButton, panelState.CanPurchase);
             }
         }
 
@@ -282,6 +280,26 @@ public partial class SandRunnersPrototype
     {
         if (button != null && button.button != null)
             button.button.gameObject.SetActive(visible);
+    }
+
+    private void SetDiplomacyButtonAvailable(StrategicCanvasButton button, bool available)
+    {
+        if (button != null && button.button != null)
+            button.button.interactable = available;
+    }
+
+    private SandRunnersDiplomacyPanelState BuildDiplomacyPanelState(SettlementDevelopmentState state, FactionContractOffer offer)
+    {
+        float distance = battlePyramid != null && state != null && state.settlement != null && state.settlement.root != null
+            ? FlatDistance(battlePyramid.position, state.settlement.root.position) : float.MaxValue;
+        bool powerOnline = state != null && (state.horusPower || (state.network != null && state.network.online));
+        bool alive = state != null && state.settlement != null && state.settlement.health > 0f;
+        return diplomacyPanelController.BuildState(distance, state != null ? state.playerDeals : 0,
+            state != null ? state.tradeTrust : 0f, state != null ? state.playerInfluence : 0f, powerOnline,
+            state != null && state.stage == SettlementDiplomacyStage.AlliedSettlement, alive,
+            state == null || IsSettlementUnavailableToPlayer(state), state != null ? state.contractStock : 0,
+            state != null ? state.contractRestockTimer : 0f, sand, gold, wind,
+            offer != null ? offer.price.sand : 0f, offer != null ? offer.price.gold : 0f, offer != null ? offer.price.wind : 0f);
     }
 
     private void TalkToActiveSettlement()
@@ -373,12 +391,10 @@ public partial class SandRunnersPrototype
         if (offer == null || activeDiplomacyState == null)
             return;
 
-        bool allied = activeDiplomacyState.stage == SettlementDiplomacyStage.AlliedSettlement;
-        if (!SandRunnersDiplomacyRules.CanPurchaseContract(allied, activeDiplomacyState.contractStock,
-            activeDiplomacyState.settlement != null && activeDiplomacyState.settlement.health > 0f &&
-            !IsSettlementUnavailableToPlayer(activeDiplomacyState)))
+        SandRunnersDiplomacyPanelState panelState = BuildDiplomacyPanelState(activeDiplomacyState, offer);
+        if (!panelState.CanPurchase)
         {
-            ShowBanner(allied ? "CONTRACT OUT OF STOCK" : "ALLIANCE REQUIRED", 2.6f);
+            ShowBanner(panelState.BlockReason, 2.6f);
             return;
         }
 
@@ -402,7 +418,7 @@ public partial class SandRunnersPrototype
         {
             SettlementDevelopmentState state = pair.Value;
             if (state == null || state.contractStock > 0 || state.settlement == null || state.settlement.health <= 0f ||
-                state.stage != SettlementDiplomacyStage.AlliedSettlement)
+                IsSettlementUnavailableToPlayer(state) || state.stage != SettlementDiplomacyStage.AlliedSettlement)
                 continue;
             state.contractRestockTimer -= dt;
             if (state.contractRestockTimer <= 0f)

@@ -134,6 +134,7 @@ public partial class SandRunnersPrototype
         }
         CreatePointLight(root, "Neutral_Signal_Light", new Vector3(0f, 6.2f, 0f), kind == NeutralFactionKind.BlueTraders ? new Color(0.08f, 0.32f, 1f, 1f) : new Color(0.55f, 0.68f, 1f, 1f), 1.25f, 28f);
         CreateNeutralLabel(root, labelText, 7.8f, accent);
+        CreateNeutralDiplomacyMarker(root, 9.1f, accent);
     }
 
     private void CreateGrounderSettlement(string objectName, string labelText, Vector3 position)
@@ -155,6 +156,7 @@ public partial class SandRunnersPrototype
         }
         CreatePointLight(root, "Grounder_Fire_Light", new Vector3(0f, 3.2f, 0f), new Color(1f, 0.42f, 0.12f, 1f), 1.1f, 24f);
         CreateNeutralLabel(root, labelText, 5.3f, grounderShellMaterial);
+        CreateNeutralDiplomacyMarker(root, 6.6f, grounderShellMaterial);
     }
 
     private Transform CreateNeutralGuard(Transform parent, string name, Vector3 localPosition, Material material, bool grounder)
@@ -191,6 +193,19 @@ public partial class SandRunnersPrototype
         label.anchor = TextAnchor.MiddleCenter;
         label.alignment = TextAlignment.Center;
         label.color = material == grounderShellMaterial ? new Color(1f, 0.72f, 0.35f, 1f) : new Color(0.58f, 0.82f, 1f, 1f);
+    }
+
+    private void CreateNeutralDiplomacyMarker(Transform root, float height, Material material)
+    {
+        TextMesh marker = new GameObject("Diplomacy_Access_Marker").AddComponent<TextMesh>();
+        marker.transform.SetParent(root, false);
+        marker.transform.localPosition = new Vector3(0f, height, 0f);
+        marker.transform.localRotation = Quaternion.Euler(62f, 0f, 0f);
+        marker.text = "◆ DIPLOMACY // T // 220m ◆";
+        marker.characterSize = 0.34f;
+        marker.anchor = TextAnchor.MiddleCenter;
+        marker.alignment = TextAlignment.Center;
+        marker.color = material == grounderShellMaterial ? new Color(1f, 0.82f, 0.42f, 1f) : new Color(0.4f, 0.92f, 1f, 1f);
     }
 
     private void SpawnJuzzherBarge(Vector3 position)
