@@ -14,6 +14,17 @@ public partial class SandRunnersPrototype
         SalvageHive
     }
 
+
+    internal sealed class HorusDevelopmentStatusModel
+    {
+        public HorusDevelopmentOrderState state;
+        public string targetLabel;
+        public int level;
+        public int maxLevel;
+        public float progress;
+        public float requiredProgress;
+        public bool active;
+    }
     private sealed class ResourceDevelopmentProject
     {
         public ResourceDevelopmentKind kind;
@@ -44,6 +55,7 @@ public partial class SandRunnersPrototype
     {
         public ResourceNode node;
         public ResourceDevelopmentKind kind;
+        public HorusDevelopmentOrderState horusState;
         public int stationSeed;
     }
 
@@ -65,6 +77,8 @@ public partial class SandRunnersPrototype
     private readonly Dictionary<RunnerUnit, ResourceDevelopmentAssignment> runnerDevelopmentOrders =
         new Dictionary<RunnerUnit, ResourceDevelopmentAssignment>();
     private readonly List<MineConvoyState> mineConvoys = new List<MineConvoyState>();
+    private readonly HashSet<RunnerUnit> transformedFortressCrushers = new HashSet<RunnerUnit>();
+    private HorusDevelopmentOrderState horusDevelopmentState = HorusDevelopmentOrderState.Invalid;
     private ResourceDevelopmentAssignment horusDevelopmentOrder;
     private GameObject curseHivePanelObject;
     private Text curseHiveStatusText;
@@ -174,6 +188,8 @@ public partial class SandRunnersPrototype
         if (touchOfHorus != null && selectedStrategicTransform == touchOfHorus.root)
         {
             horusDevelopmentOrder = CreateResourceDevelopmentAssignment(node, ResourceDevelopmentKind.HorusNanoTree, touchOfHorus.root);
+            horusDevelopmentOrder.horusState = HorusDevelopmentOrderState.Moving;
+            horusDevelopmentState = HorusDevelopmentOrderState.Moving;
             touchOfHorus.pinnedTarget = null;
             touchOfHorus.hasMoveDestination = false;
             assigned++;
@@ -249,6 +265,7 @@ public partial class SandRunnersPrototype
         assignment.node = node;
         assignment.kind = kind;
         assignment.stationSeed = developer != null ? Mathf.Abs(developer.GetHashCode()) : (int)kind * 37;
+        assignment.horusState = HorusDevelopmentOrderState.Invalid;
         return assignment;
     }
 
@@ -268,7 +285,7 @@ public partial class SandRunnersPrototype
             kind = ResourceDevelopmentKind.ScarabFortress;
             return true;
         }
-        if (HasCapability(runner, UnitCapability.FortressCrusherDeveloper))
+        if (SandRunnersHorusDevelopmentRules.IsFortressCrusherDeveloper((int)runner.capabilities) && !transformedFortressCrushers.Contains(runner))
         {
             kind = ResourceDevelopmentKind.FortressCrusherAscension;
             return true;
@@ -323,20 +340,65 @@ public partial class SandRunnersPrototype
 
     private bool UpdateResourceDeveloper(TouchOfHorusState horus, float dt)
     {
-        if (horus == null || horusDevelopmentOrder == null)
+        if (horusDevelopmentOrder == null)
             return false;
+        if (horus == null || horus.root == null)
+        {
+            SetHorusDevelopmentState(HorusDevelopmentOrderState.Invalid);
+            horusDevelopmentOrder = null;
+            return false;
+        }
+
         if (!IsValidDevelopmentAssignment(horusDevelopmentOrder))
         {
+            SetHorusDevelopmentState(HorusDevelopmentOrderState.Invalid);
             horusDevelopmentOrder = null;
             return false;
         }
 
         bool stationed = MoveDeveloperToResource(horus.root, horusDevelopmentOrder, 8.5f, dt, false);
+        ResourceDevelopmentProject project = GetResourceDevelopmentProject(horusDevelopmentOrder.node, horusDevelopmentOrder.kind);
+        SetHorusDevelopmentState(SandRunnersHorusDevelopmentRules.EvaluateState(true, true, true, stationed,
+            horusDevelopmentOrder.node.controlled, horusDevelopmentOrder.node.capture,
+            GetResourceCaptureStrength(horusDevelopmentOrder.node), project != null ? project.level : 0,
+            GetResourceDevelopmentMaxLevel(horusDevelopmentOrder.kind)));
         if (stationed && horusDevelopmentOrder.node.controlled)
             ProgressResourceDevelopment(horusDevelopmentOrder.node, horusDevelopmentOrder.kind, horus.root, null, dt);
         return true;
     }
 
+
+    private void SetHorusDevelopmentState(HorusDevelopmentOrderState state)
+    {
+        horusDevelopmentState = state;
+        if (horusDevelopmentOrder != null)
+            horusDevelopmentOrder.horusState = state;
+    }
+
+    // StrategicCanvas integration hook: render this model and invoke CancelHorusResourceDevelopmentOrder().
+    internal HorusDevelopmentStatusModel GetHorusDevelopmentStatusModel()
+    {
+        HorusDevelopmentStatusModel model = new HorusDevelopmentStatusModel();
+        model.state = horusDevelopmentState;
+        model.active = horusDevelopmentOrder != null;
+        if (horusDevelopmentOrder == null || horusDevelopmentOrder.node == null)
+            return model;
+
+        model.targetLabel = horusDevelopmentOrder.node.label;
+        ResourceDevelopmentProject project = GetResourceDevelopmentProject(horusDevelopmentOrder.node, horusDevelopmentOrder.kind);
+        model.level = project != null ? project.level : 0;
+        model.maxLevel = GetResourceDevelopmentMaxLevel(horusDevelopmentOrder.kind);
+        model.progress = project != null ? project.progress : 0f;
+        model.requiredProgress = project != null && project.level < model.maxLevel
+            ? GetResourceDevelopmentSeconds(horusDevelopmentOrder.kind, project.level) : 0f;
+        return model;
+    }
+
+    internal void CancelHorusResourceDevelopmentOrder()
+    {
+        SetHorusDevelopmentState(HorusDevelopmentOrderState.Invalid);
+        horusDevelopmentOrder = null;
+    }
     private bool IsValidDevelopmentAssignment(ResourceDevelopmentAssignment assignment)
     {
         return assignment != null && assignment.node != null && assignment.node.transform != null;
@@ -406,6 +468,8 @@ public partial class SandRunnersPrototype
         if (project.level >= maxLevel)
         {
             HoldCompletedDeveloper(kind, developer, runner);
+            if (kind == ResourceDevelopmentKind.FortressCrusherAscension && runner != null)
+                ApplyFortressCrusherAscension(node, runner);
             return;
         }
 
@@ -428,6 +492,8 @@ public partial class SandRunnersPrototype
         project.level++;
         BuildOrUpgradeResourceDevelopment(node, project);
         ApplyResourceDevelopmentCompletion(node, project, runner);
+        if (kind == ResourceDevelopmentKind.HorusNanoTree && project.level >= maxLevel)
+            SetHorusDevelopmentState(HorusDevelopmentOrderState.Complete);
         PlaySandRunnerSound(SandRunnerSound.ProductionComplete, node.transform.position, 0.76f);
         ShowBanner(GetResourceDevelopmentTitle(project.kind) + " // LEVEL " + project.level, 2.6f);
         lastEvent = GetResourceDevelopmentTitle(project.kind) + " reached level " + project.level +
@@ -441,8 +507,6 @@ public partial class SandRunnersPrototype
 
         if (runner != null)
             runnerDevelopmentOrders.Remove(runner);
-        if (kind == ResourceDevelopmentKind.HorusNanoTree)
-            horusDevelopmentOrder = null;
     }
 
     private int GetResourceDevelopmentMaxLevel(ResourceDevelopmentKind kind)
@@ -680,6 +744,9 @@ public partial class SandRunnersPrototype
 
     private void ApplyFortressCrusherAscension(ResourceNode node, RunnerUnit runner)
     {
+        if (runner == null || transformedFortressCrushers.Contains(runner))
+            return;
+        transformedFortressCrushers.Add(runner);
         runner.displayName = "Fortress Crusher 2.0 // " + GetResourceKitName(node.kind);
         runner.capabilities &= ~UnitCapability.FortressCrusherDeveloper;
         runner.maxHealth += node.kind == ResourceKind.Sand ? 420f : 260f;
@@ -687,6 +754,8 @@ public partial class SandRunnersPrototype
         runner.damage += node.kind == ResourceKind.Gold ? 58f : 34f;
         runner.range += node.kind == ResourceKind.Gold ? 18f : 10f;
         runner.speed += node.kind == ResourceKind.Wind ? 3.2f : 1.2f;
+        runner.autonomous = true;
+        runner.hasOrder = false;
         AddResourceTransformationKit(runner.transform, node.kind, "Crusher_2_0");
     }
 
