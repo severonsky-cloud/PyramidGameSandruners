@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!49 &4900000
+TextAsset:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PresentationArtPass_InventoryAndHooks
+  m_Script: 'SandRunners Presentation Art Pass
+
+    BASE COMMIT: a47e0c8f4d924a6788a4fb07d64731e57ab8a426
+
+
+    Imported
+    FBX: SR_MineConvoyTruck_LOD0/1/2, SR_MineEngineerRover_LOD0/1/2, Sebek_Running,
+    Sebek_Walking.
+
+    GLB found in Assets: none. Meshy-named assets found: none.
+
+    Existing
+    authored prefabs reused: SR_BattlePyramid_Authored, SR_GoldenScarab_Authored,
+    SR_ImperialAssault_Authored, SR_MandarinkaPalace_Authored.
+
+    AnimationClips:
+    no new clips; Sebek FBX animation imports remain available.
+
+    Audio reused:
+    SR_Pyramid_Engine for Apex charge, SR_Howitzer for Apex fire, SR_AmbiencePulse
+    for Apex recovery.
+
+    Materials reused: Gold, PaleGold, DarkMetal, Gunmetal,
+    CyanGlass, Ivory, Jade, Intro_Blue_Panoramic_Glass.
+
+
+    New prefabs: Presentation/SR_BattlePyramid_ArtPass,
+    Presentation/SR_Apex_Art, Presentation/SR_ResourceMine_Art, Presentation/SR_NeutralSettlement_Art.
+
+    ResourceMine
+    uses existing imported Mine FBX candidates; imported LOD2 is used as the source
+    mesh to keep the prefab budget bounded.
+
+
+    Hooks: SandRunnersAuthoredArtPass
+    loads the new Resources prefabs. Pyramid art uses the existing visual hook; Apex
+    attaches below the authored pyramid root; ResourceMine attaches to Resource_Sand_Refinery_01;
+    NeutralSettlement attaches to Grounder_Settlement_West when those visual hosts
+    exist.
+
+    Anchors: Pyramid Muzzle/Engine/Door_Cargo/Hardpoints/Apex_Focus;
+    Apex Focus/ChargeOrigin/BeamTarget; Mine Engine/Door/Hardpoints/Drills/ResourceOutput;
+    Settlement Trade/Defense/Caravan/Diplomacy.
+
+
+    No AI, economy, mission, bootstrap,
+    Build Settings or Player build changes.'

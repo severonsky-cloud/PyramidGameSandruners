@@ -5,6 +5,10 @@ using UnityEngine;
 public partial class SandRunnersPrototype
 {
     private GameObject authoredBattlePyramidPrefab;
+    private GameObject authoredPyramidArtPassPrefab;
+    private GameObject authoredApexArtPrefab;
+    private GameObject authoredResourceMinePrefab;
+    private GameObject authoredNeutralSettlementPrefab;
     private GameObject authoredGoldenScarabPrefab;
     private GameObject authoredScarabTankPrefab;
     private GameObject authoredSalvageScarabPrefab;
@@ -14,6 +18,7 @@ public partial class SandRunnersPrototype
     private GameObject authoredImperialAssaultPrefab;
     private GameObject authoredMandarinkaPalacePrefab;
     private bool authoredArtAssetsLoaded;
+    private bool presentationWorldArtAttached;
     private float nextAuthoredArtVisibilityCheck;
     private Transform authoredBattlePyramidInstance;
     private Transform authoredMandarinkaPalaceInstance;
@@ -26,6 +31,7 @@ public partial class SandRunnersPrototype
         AttachAuthoredBattlePyramid();
         AttachAuthoredMandarinkaPalace();
         StartCoroutine(RefreshAuthoredReplacementVisibility());
+        StartCoroutine(AttachPresentationWorldArtAfterWorldSetup());
     }
 
     private IEnumerator RefreshAuthoredReplacementVisibility()
@@ -122,13 +128,66 @@ public partial class SandRunnersPrototype
         }
     }
 
+    private IEnumerator AttachPresentationWorldArtAfterWorldSetup()
+    {
+        for (int attempt = 0; attempt < 16; attempt++)
+        {
+            TryAttachPresentationWorldArt();
+            if (presentationWorldArtAttached)
+                yield break;
+            yield return new WaitForSecondsRealtime(0.25f);
+        }
+    }
+
+    private void TryAttachPresentationWorldArt()
+    {
+        if (battlePyramid != null && authoredApexArtPrefab != null &&
+            battlePyramid.Find("SR_Authored_Apex_Art") == null)
+        {
+            GameObject apex = Instantiate(authoredApexArtPrefab, battlePyramid);
+            apex.name = "SR_Authored_Apex_Art";
+            apex.transform.localPosition = new Vector3(0f, 3.1f, 0f);
+            apex.transform.localRotation = Quaternion.identity;
+            apex.transform.localScale = Vector3.one * 0.62f;
+        }
+
+        AttachPresentationVisualToNamedRoot("Resource_Sand_Refinery_01", authoredResourceMinePrefab, "SR_Authored_Resource_Mine_Art", Vector3.one * 0.72f);
+        AttachPresentationVisualToNamedRoot("Grounder_Settlement_West", authoredNeutralSettlementPrefab, "SR_Authored_Neutral_Settlement_Art", Vector3.one * 0.78f);
+
+        presentationWorldArtAttached =
+            battlePyramid != null && battlePyramid.Find("SR_Authored_Apex_Art") != null &&
+            GameObject.Find("SR_Authored_Resource_Mine_Art") != null &&
+            GameObject.Find("SR_Authored_Neutral_Settlement_Art") != null;
+    }
+
+    private void AttachPresentationVisualToNamedRoot(string hostName, GameObject prefab, string instanceName, Vector3 scale)
+    {
+        if (prefab == null)
+            return;
+
+        GameObject host = GameObject.Find(hostName);
+        if (host == null || host.transform.Find(instanceName) != null)
+            return;
+
+        HideAuthoredReplacementRenderers(host.transform);
+        GameObject instance = Instantiate(prefab, host.transform);
+        instance.name = instanceName;
+        instance.transform.localPosition = Vector3.zero;
+        instance.transform.localRotation = Quaternion.identity;
+        instance.transform.localScale = scale;
+    }
+
     private void EnsureAuthoredArtAssets()
     {
         if (authoredArtAssetsLoaded)
             return;
 
         authoredArtAssetsLoaded = true;
-        authoredBattlePyramidPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/SR_BattlePyramid_Authored");
+        authoredPyramidArtPassPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/Presentation/SR_BattlePyramid_ArtPass");
+        authoredApexArtPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/Presentation/SR_Apex_Art");
+        authoredResourceMinePrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/Presentation/SR_ResourceMine_Art");
+        authoredNeutralSettlementPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/Presentation/SR_NeutralSettlement_Art");
+        authoredBattlePyramidPrefab = authoredPyramidArtPassPrefab ?? Resources.Load<GameObject>("SandRunners/Models/ArtPass/SR_BattlePyramid_Authored");
         authoredGoldenScarabPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/SR_GoldenScarab_Authored");
         authoredScarabTankPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/ScarabVariants/SR_ScarabTank_Art");
         authoredSalvageScarabPrefab = Resources.Load<GameObject>("SandRunners/Models/ArtPass/ScarabVariants/SR_SalvageScarab_Art");
