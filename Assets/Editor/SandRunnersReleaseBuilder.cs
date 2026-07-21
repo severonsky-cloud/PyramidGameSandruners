@@ -15,6 +15,7 @@ public static class SandRunnersReleaseBuilder
     public static void BuildWindowsRtsReleaseCandidate()
     {
         ConfigureRtsReleaseProfile();
+        EnsureMcpRuntimeExcludedFromStandalone();
 
         SandRunnersSceneValidationReport validation = SandRunnersSceneValidator.ValidateStartupScenes();
         if (!validation.Passed)
@@ -55,6 +56,7 @@ public static class SandRunnersReleaseBuilder
                 ", warnings: " + summary.totalWarnings);
         }
 
+        PruneDevelopmentAssemblies(outputDirectory);
         WriteReleaseManifest(outputDirectory, summary);
         Debug.Log(
             "SandRunners Windows RTS release candidate built successfully: " + outputPath +
@@ -75,6 +77,36 @@ public static class SandRunnersReleaseBuilder
         AssetDatabase.SaveAssets();
     }
 
+    private static void EnsureMcpRuntimeExcludedFromStandalone()
+    {
+        string defines = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Standalone);
+        string[] tokens = defines.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+        if (Array.Exists(tokens, token => token.Trim() == "UNITY_MCP_READY"))
+        {
+            throw new BuildFailedException(
+                "UNITY_MCP_READY is active for Standalone. Build from the isolated release profile so MCP runtime cannot enter the Player.");
+        }
+    }
+
+    private static void PruneDevelopmentAssemblies(string outputDirectory)
+    {
+        string managedDirectory = Path.Combine(outputDirectory, "SandRunners_Data", "Managed");
+        string[] developmentAssemblies =
+        {
+            "com.IvanMurzak.Unity.MCP.Runtime.dll",
+            "com.IvanMurzak.Unity.MCP.TestFiles.dll",
+            "McpPlugin.Common.dll",
+            "McpPlugin.dll"
+        };
+
+        for (int i = 0; i < developmentAssemblies.Length; i++)
+        {
+            string assemblyPath = Path.Combine(managedDirectory, developmentAssemblies[i]);
+            if (File.Exists(assemblyPath))
+                File.Delete(assemblyPath);
+        }
+    }
+
     private static void WriteReleaseManifest(string outputDirectory, BuildSummary summary)
     {
         string manifestPath = Path.Combine(outputDirectory, "RELEASE_INFO.txt");
@@ -88,7 +120,8 @@ public static class SandRunnersReleaseBuilder
             "Build result: " + summary.result,
             "Build size: " + summary.totalSize + " bytes",
             "Sebek prologue: excluded pending scene repair",
-            "Runtime authored-art replacement: disabled; stable gameplay visuals retained"
+            "Runtime authored-art replacement: disabled; stable gameplay visuals retained",
+            "MCP runtime: excluded"
         };
         File.WriteAllLines(manifestPath, lines);
     }
