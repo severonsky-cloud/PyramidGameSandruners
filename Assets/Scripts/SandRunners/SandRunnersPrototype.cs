@@ -2795,14 +2795,16 @@ public partial class SandRunnersPrototype : MonoBehaviour
     private void DrawMainMenuGUI()
     {
         Rect panel = CenterRect(720f, 548f);
+        bool prologueAvailable = SandRunnersBootstrap.IsFullPrologueAvailable();
         DrawPanelRect(panel, new Color(0.016f, 0.035f, 0.075f, 0.94f), new Color(1f, 0.76f, 0.23f, 1f));
         GUI.Label(new Rect(panel.x + 24f, panel.y + 28f, panel.width - 48f, 54f), "BATTLE FOR UNIVERSE", menuTitleStyle);
         GUI.Label(new Rect(panel.x + 24f, panel.y + 78f, panel.width - 48f, 34f), "Sand runners", menuTitleStyle);
-        GUI.Label(new Rect(panel.x + 74f, panel.y + 138f, panel.width - 148f, 86f),
-            "Sebek-nu-Anha has stolen Robert from the Red Elemental palace. Begin inside the pyramid, then command the desert campaign against Mandarinka.",
-            menuBodyStyle);
+        string campaignDescription = prologueAvailable
+            ? "Sebek-nu-Anha has stolen Robert from the Red Elemental palace. Begin inside the pyramid, then command the desert campaign against Mandarinka."
+            : "Command the battle pyramid and its desert armies against Mandarinka. The Sebek prologue is reserved for a later story release.";
+        GUI.Label(new Rect(panel.x + 74f, panel.y + 138f, panel.width - 148f, 86f), campaignDescription, menuBodyStyle);
 
-        if (GUI.Button(new Rect(panel.x + 220f, panel.y + 238f, 280f, 44f), "NEW GAME // PROLOGUE", menuButtonStyle))
+        if (GUI.Button(new Rect(panel.x + 220f, panel.y + 238f, 280f, 44f), prologueAvailable ? "NEW GAME // PROLOGUE" : "NEW GAME // RTS CAMPAIGN", menuButtonStyle))
         {
             PlaySandRunnerSound(SandRunnerSound.UiConfirm, Vector3.zero, 0.6f);
             ReloadSceneForNewGame();
@@ -2890,7 +2892,10 @@ public partial class SandRunnersPrototype : MonoBehaviour
 
     private void ReloadSceneForNewGame()
     {
-        SandRunnersBootstrap.StartFullPrologue();
+        if (SandRunnersBootstrap.IsFullPrologueAvailable())
+            SandRunnersBootstrap.StartFullPrologue();
+        else
+            SandRunnersBootstrap.StartSkippedPrologue();
     }
 
     private void StartRtsWithoutPrologue()

@@ -44,9 +44,26 @@ public static class SandRunnersSceneValidator
     public static SandRunnersSceneValidationReport ValidateStartupScenes()
     {
         SandRunnersSceneValidationReport report = new SandRunnersSceneValidationReport();
-        ValidateScene(report, IntroScenePath, typeof(SebekBedroomIntroController));
         ValidateScene(report, RtsScenePath, typeof(SandRunnersPrototype));
+
+        if (IsSceneEnabledInBuildSettings(IntroScenePath))
+            ValidateScene(report, IntroScenePath, typeof(SebekBedroomIntroController));
+        else
+            report.warnings.Add("Sebek prologue is excluded from this RTS release profile and was not validated.");
+
         return report;
+    }
+
+    private static bool IsSceneEnabledInBuildSettings(string path)
+    {
+        EditorBuildSettingsScene[] scenes = EditorBuildSettings.scenes;
+        for (int i = 0; i < scenes.Length; i++)
+        {
+            if (scenes[i].enabled && scenes[i].path == path)
+                return true;
+        }
+
+        return false;
     }
 
     private static void ValidateScene(SandRunnersSceneValidationReport report, string path, System.Type expectedController)

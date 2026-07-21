@@ -422,6 +422,7 @@ public partial class SandRunnersPrototype
         UpdateCurseHiveUi();
         UpdateVerticalSliceMissionUi();
         UpdateHorusDiplomacyUi();
+        UpdateHorusDevelopmentCanvas();
         UpdateSalvageCanvas(dt);
 
         if (hudHidden)

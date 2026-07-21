@@ -16,6 +16,11 @@ public sealed class SandRunnersBootstrap : MonoBehaviour
     private GUIStyle bodyStyle;
     private GUIStyle buttonStyle;
 
+    public static bool IsFullPrologueAvailable()
+    {
+        return Application.CanStreamedLevelBeLoaded(IntroSceneName);
+    }
+
     public static bool StartFullPrologue()
     {
         SandRunnersSessionBootstrap.RequestFullPrologue();
