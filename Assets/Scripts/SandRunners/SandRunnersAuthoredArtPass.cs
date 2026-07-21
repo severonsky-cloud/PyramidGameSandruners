@@ -4,6 +4,12 @@ using UnityEngine;
 
 public partial class SandRunnersPrototype
 {
+    // The current authored presentation prefabs are showcase assets, not safe
+    // drop-in gameplay replacements. Keep them available for art review, but
+    // never hide the proven procedural combat geometry until a replacement has
+    // passed an in-game silhouette/LOD/anchor validation pass.
+    private const bool EnableRuntimeAuthoredArtReplacements = false;
+
     private GameObject authoredBattlePyramidPrefab;
     private GameObject authoredPyramidArtPassPrefab;
     private GameObject authoredApexArtPrefab;
@@ -27,6 +33,9 @@ public partial class SandRunnersPrototype
 
     private void InitializeAuthoredArtPass()
     {
+        if (!EnableRuntimeAuthoredArtReplacements)
+            return;
+
         EnsureAuthoredArtAssets();
         AttachAuthoredBattlePyramid();
         AttachAuthoredMandarinkaPalace();
@@ -67,6 +76,9 @@ public partial class SandRunnersPrototype
 
     private void MaintainAuthoredArtVisibility(float unscaledTime)
     {
+        if (!EnableRuntimeAuthoredArtReplacements)
+            return;
+
         if (authoredBattlePyramidInstance == null)
         {
             GameObject pyramidArt = GameObject.Find("SR_Authored_Battle_Pyramid");
@@ -237,6 +249,9 @@ public partial class SandRunnersPrototype
 
     private void ApplyAuthoredGoldenVehicleArt(Transform root, string unitName, Vector3 gameplayScale)
     {
+        if (!EnableRuntimeAuthoredArtReplacements)
+            return;
+
         if (root == null || string.IsNullOrEmpty(unitName) || !unitName.Contains("Scarab"))
             return;
 
@@ -277,6 +292,9 @@ public partial class SandRunnersPrototype
 
     private void ApplyAuthoredImperialAssaultArt(Transform root)
     {
+        if (!EnableRuntimeAuthoredArtReplacements)
+            return;
+
         if (root == null)
             return;
 
