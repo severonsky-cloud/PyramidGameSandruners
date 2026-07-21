@@ -105,6 +105,10 @@ public static class SandRunnersReleaseBuilder
             if (File.Exists(assemblyPath))
                 File.Delete(assemblyPath);
         }
+
+        string burstDebugDirectory = Path.Combine(outputDirectory, "SandRunners_BurstDebugInformation_DoNotShip");
+        if (Directory.Exists(burstDebugDirectory))
+            Directory.Delete(burstDebugDirectory, true);
     }
 
     private static void WriteReleaseManifest(string outputDirectory, BuildSummary summary)
