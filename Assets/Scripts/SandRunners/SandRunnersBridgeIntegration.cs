@@ -10,4 +10,12 @@ public partial class SandRunnersPrototype
         if (gameFlowState == SandRunnersGameFlowState.MainMenu)
             StartDirectRtsFromMenu();
     }
+
+    public void SetCommandBridgePresentationActive(bool active)
+    {
+        hudHidden = active;
+        PublishStrategicUiEvent(StrategicUiEventKind.StrategicCanvasVisibility, !active);
+        if (active)
+            SetCommandCursorMode(false);
+    }
 }

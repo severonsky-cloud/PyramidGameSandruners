@@ -16,10 +16,15 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
     }
 
     private const string SebekWalkingResource = "SandRunners/Models/Sebek/Sebek_Walking";
+    private const string CommandBridgeResource = "SandRunners/CommandBridge/CommandBridge";
     private SandRunnersPrototype prototype;
     private Transform bridgeRoot;
     private Transform sebekRoot;
     private Transform sebekVisual;
+    private Animation sebekAnimation;
+    private AnimationClip sebekWalkClip;
+    private AnimationClip sebekRunClip;
+    private string sebekPlayingClip;
     private Camera activeCamera;
     private Canvas bridgeCanvas;
     private Canvas strategicCanvas;
@@ -30,8 +35,8 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
     private float savedCameraFov = 60f;
     private float yaw;
     private float pitch = 12f;
+    private float bridgeCameraDistance = 2.6f;
     private bool initialized;
-    private static bool enterBridgeAfterSceneLoad;
 
     public InternalState State => state;
     public bool IsInsideBridge => state == InternalState.BridgeThirdPerson ||
@@ -92,11 +97,7 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
             else
             {
                 if (!prototype.IsCommandBridgeGameplayAvailable())
-                {
-                    enterBridgeAfterSceneLoad = true;
-                    prototype.StartDirectRtsForCommandBridge();
                     return;
-                }
                 EnterState(InternalState.BridgeThirdPerson);
             }
         }
@@ -147,11 +148,6 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
             strategicCanvas = strategicCanvasObject.GetComponent<Canvas>();
         SetBridgeVisible(false);
         initialized = true;
-        if (enterBridgeAfterSceneLoad)
-        {
-            enterBridgeAfterSceneLoad = false;
-            EnterState(InternalState.BridgeThirdPerson);
-        }
     }
 
     private void EnterState(InternalState next)
@@ -172,6 +168,7 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
 
         state = next;
         SetBridgeVisible(willBeInside);
+        prototype.SetCommandBridgePresentationActive(willBeInside);
 
         if (willBeInside)
         {
@@ -212,49 +209,32 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
 
     private void BuildBridge()
     {
-        bridgeRoot = new GameObject("CommandBridge_RuntimeSlice").transform;
+        GameObject bridgePrefab = Resources.Load<GameObject>(CommandBridgeResource);
+        GameObject bridgeObject = bridgePrefab != null
+            ? Instantiate(bridgePrefab)
+            : new GameObject("CommandBridge_MissingPrefab");
+        bridgeObject.name = "CommandBridge_RuntimeSlice";
+        bridgeRoot = bridgeObject.transform;
         bridgeRoot.SetParent(prototype.battlePyramid, false);
-        bridgeRoot.localPosition = new Vector3(0f, 7.5f, 0f);
-        bridgeRoot.localRotation = Quaternion.identity;
+        Vector3 parentScale = prototype.battlePyramid.lossyScale;
+        float bridgeWorldHeight = 7.5f * Mathf.Max(1f, Mathf.Abs(parentScale.y));
+        bridgeRoot.position = prototype.battlePyramid.position + prototype.battlePyramid.up * bridgeWorldHeight;
+        bridgeRoot.rotation = prototype.battlePyramid.rotation;
+        bridgeRoot.localScale = new Vector3(
+            1f / Mathf.Max(0.001f, Mathf.Abs(parentScale.x)),
+            1f / Mathf.Max(0.001f, Mathf.Abs(parentScale.y)),
+            1f / Mathf.Max(0.001f, Mathf.Abs(parentScale.z)));
 
-        Material basalt = MakeMaterial("Bridge Basalt", new Color(0.018f, 0.025f, 0.04f));
-        Material gold = MakeMaterial("Bridge Gold", new Color(0.48f, 0.27f, 0.035f));
-        Material glass = MakeMaterial("Bridge Window", new Color(0.025f, 0.18f, 0.3f, 0.25f));
-        Material holo = MakeMaterial("Bridge Hologram", new Color(0.04f, 0.55f, 1f, 0.72f));
-
-        Primitive(PrimitiveType.Cube, "Deck", new Vector3(0f, -0.15f, 0f), new Vector3(18f, 0.3f, 13f), basalt);
-        Primitive(PrimitiveType.Cube, "RearBulkhead", new Vector3(0f, 3.2f, -6.35f), new Vector3(18f, 6.4f, 0.3f), basalt);
-        Primitive(PrimitiveType.Cube, "LeftBulkhead", new Vector3(-8.85f, 3.2f, 0f), new Vector3(0.3f, 6.4f, 13f), basalt);
-        Primitive(PrimitiveType.Cube, "RightBulkhead", new Vector3(8.85f, 3.2f, 0f), new Vector3(0.3f, 6.4f, 13f), basalt);
-        Primitive(PrimitiveType.Cube, "Ceiling", new Vector3(0f, 6.25f, 0f), new Vector3(18f, 0.25f, 13f), basalt);
-
-        Primitive(PrimitiveType.Cube, "PanoramicWindow", new Vector3(0f, 3.1f, 6.3f), new Vector3(13.8f, 5.5f, 0.12f), glass, false);
-        Primitive(PrimitiveType.Cube, "WindowLeftPillar", new Vector3(-7.3f, 3.1f, 6.15f), new Vector3(0.7f, 6f, 0.45f), gold);
-        Primitive(PrimitiveType.Cube, "WindowRightPillar", new Vector3(7.3f, 3.1f, 6.15f), new Vector3(0.7f, 6f, 0.45f), gold);
-        Primitive(PrimitiveType.Cube, "WindowHeader", new Vector3(0f, 5.85f, 6.15f), new Vector3(15.2f, 0.55f, 0.45f), gold);
-
-        Primitive(PrimitiveType.Cube, "NavigatorPost", new Vector3(-5.4f, 0.8f, 2.3f), new Vector3(3f, 1.6f, 1.8f), gold);
-        Primitive(PrimitiveType.Cube, "WeaponsConsole", new Vector3(5.4f, 0.8f, 2.3f), new Vector3(3f, 1.6f, 1.8f), gold);
-        Primitive(PrimitiveType.Cylinder, "RadioStation", new Vector3(-6.5f, 0.8f, -3.5f), new Vector3(1.2f, 0.8f, 1.2f), gold);
-        Primitive(PrimitiveType.Cube, "FutureLiftDoors", new Vector3(0f, 2.1f, -6.12f), new Vector3(3.8f, 4.2f, 0.2f), gold);
-
-        Transform holomap = Primitive(PrimitiveType.Cylinder, "HolomapConsole", new Vector3(0f, 0.55f, 1f), new Vector3(2.8f, 0.55f, 2.8f), gold);
-        Transform projection = Primitive(PrimitiveType.Sphere, "HolomapProjection", new Vector3(0f, 2.15f, 1f), new Vector3(1.35f, 1.35f, 1.35f), holo, false);
-        projection.SetParent(holomap.parent, true);
-
-        for (int i = 0; i < 4; i++)
-        {
-            Transform point = new GameObject("CrewPoint_" + (i + 1)).transform;
-            point.SetParent(bridgeRoot, false);
-            point.localPosition = new Vector3(i < 2 ? -5.2f : 5.2f, 0f, i % 2 == 0 ? -1.5f : 3.5f);
-        }
+        if (bridgePrefab == null)
+            Debug.LogError("Command bridge prefab is missing at Resources/" + CommandBridgeResource);
     }
 
     private void BuildSebek()
     {
         sebekRoot = new GameObject("Sebek_Bridge_Controller").transform;
         sebekRoot.SetParent(bridgeRoot, false);
-        sebekRoot.localPosition = new Vector3(0f, 0f, -3.8f);
+        Transform spawn = bridgeRoot.Find("SebekSpawn");
+        sebekRoot.localPosition = spawn != null ? spawn.localPosition : new Vector3(0f, 0f, -1.2f);
 
         GameObject prefab = Resources.Load<GameObject>(SebekWalkingResource);
         if (prefab != null)
@@ -264,17 +244,13 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
             sebekVisual = visual.transform;
             sebekVisual.localPosition = Vector3.zero;
             sebekVisual.localRotation = Quaternion.identity;
-            sebekVisual.localScale = Vector3.one * 0.32f;
+            sebekVisual.localScale = Vector3.one;
+            FitSebekVisualToHeight(1.9f);
             Collider[] colliders = visual.GetComponentsInChildren<Collider>(true);
             for (int i = 0; i < colliders.Length; i++)
                 colliders[i].enabled = false;
 
-            Animation animation = visual.GetComponent<Animation>();
-            if (animation != null)
-            {
-                animation.cullingType = AnimationCullingType.AlwaysAnimate;
-                animation.Play();
-            }
+            ConfigureSebekAnimation(visual);
         }
         else
         {
@@ -306,6 +282,10 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
             Vector2 delta = mouse.delta.ReadValue();
             yaw += delta.x * 0.09f;
             pitch = Mathf.Clamp(pitch - delta.y * 0.075f, -8f, 42f);
+            bridgeCameraDistance = Mathf.Clamp(
+                bridgeCameraDistance - mouse.scroll.ReadValue().y * 0.006f,
+                1.4f,
+                5f);
         }
 
         Vector3 forward = Quaternion.Euler(0f, yaw, 0f) * Vector3.forward;
@@ -316,13 +296,15 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
 
         Vector3 localDelta = bridgeRoot.InverseTransformDirection(direction) * ((run ? 5.2f : 2.8f) * dt);
         Vector3 next = sebekRoot.localPosition + localDelta;
-        next.x = Mathf.Clamp(next.x, -7.6f, 7.6f);
+        next.x = Mathf.Clamp(next.x, -5.2f, 5.2f);
         next.z = Mathf.Clamp(next.z, -5.2f, 5.2f);
         next.y = 0f;
         sebekRoot.localPosition = next;
 
-        if (direction.sqrMagnitude > 0.01f)
+        bool moving = direction.sqrMagnitude > 0.01f;
+        if (moving)
             sebekRoot.rotation = Quaternion.Slerp(sebekRoot.rotation, Quaternion.LookRotation(direction, bridgeRoot.up), dt * 12f);
+        UpdateSebekLocomotion(moving, run);
     }
 
     private void UpdateBridgeCamera()
@@ -331,8 +313,10 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
             return;
 
         Quaternion orbit = Quaternion.Euler(pitch, yaw, 0f);
-        Vector3 target = sebekRoot.position + bridgeRoot.up * 1.55f;
-        Vector3 desired = target - orbit * Vector3.forward * (state == InternalState.BridgeVisor ? 1.15f : 3.8f);
+        Vector3 target = sebekRoot.position + bridgeRoot.up * 1.25f;
+        Vector3 desired = target - orbit * Vector3.forward *
+                          (state == InternalState.BridgeVisor ? 0.65f : bridgeCameraDistance);
+        desired += bridgeRoot.up * (state == InternalState.BridgeVisor ? 0.1f : 0.45f);
         activeCamera.transform.position = Vector3.Lerp(activeCamera.transform.position, desired, 1f - Mathf.Exp(-14f * Time.deltaTime));
         activeCamera.transform.rotation = Quaternion.LookRotation(target - activeCamera.transform.position, bridgeRoot.up);
         activeCamera.fieldOfView = state == InternalState.BridgeVisor ? 34f : 62f;
@@ -369,6 +353,86 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
             return;
         bridgeStatus.text = "COMMAND BRIDGE // " + state.ToString().ToUpperInvariant() +
                             "\nF1 STRATEGIC  |  WASD MOVE  |  SHIFT RUN  |  TAB VISOR  |  H HOLOMAP";
+    }
+
+    private void FitSebekVisualToHeight(float targetHeight)
+    {
+        if (sebekVisual == null)
+            return;
+        Renderer[] renderers = sebekVisual.GetComponentsInChildren<Renderer>(true);
+        if (renderers.Length == 0)
+            return;
+        Bounds bounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+            bounds.Encapsulate(renderers[i].bounds);
+        if (bounds.size.y < 0.01f)
+            return;
+        float scale = targetHeight / bounds.size.y;
+        sebekVisual.localScale *= scale;
+        bounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+            bounds.Encapsulate(renderers[i].bounds);
+        sebekVisual.position += bridgeRoot.up * Vector3.Dot(sebekRoot.position - bounds.min, bridgeRoot.up);
+    }
+
+    private void ConfigureSebekAnimation(GameObject visual)
+    {
+        sebekAnimation = visual.GetComponent<Animation>();
+        if (sebekAnimation == null)
+            sebekAnimation = visual.AddComponent<Animation>();
+        sebekAnimation.playAutomatically = false;
+        sebekAnimation.cullingType = AnimationCullingType.AlwaysAnimate;
+        sebekWalkClip = LoadSebekClip("SandRunners/Models/Sebek/Sebek_Walking");
+        sebekRunClip = LoadSebekClip("SandRunners/Models/Sebek/Sebek_Running");
+        if (sebekWalkClip != null)
+            sebekAnimation.AddClip(sebekWalkClip, "BridgeWalk");
+        if (sebekRunClip != null)
+            sebekAnimation.AddClip(sebekRunClip, "BridgeRun");
+    }
+
+    private static AnimationClip LoadSebekClip(string resourcePath)
+    {
+        AnimationClip[] clips = Resources.LoadAll<AnimationClip>(resourcePath);
+        for (int i = 0; i < clips.Length; i++)
+        {
+            if (clips[i] == null || clips[i].name.StartsWith("__preview__"))
+                continue;
+            clips[i].legacy = true;
+            clips[i].wrapMode = WrapMode.Loop;
+            return clips[i];
+        }
+        return null;
+    }
+
+    private void UpdateSebekLocomotion(bool moving, bool running)
+    {
+        if (sebekAnimation == null)
+            return;
+        AnimationClip clip = running ? sebekRunClip : sebekWalkClip;
+        string clipName = running ? "BridgeRun" : "BridgeWalk";
+        if (clip == null)
+            return;
+        if (sebekPlayingClip != clipName)
+        {
+            sebekAnimation.CrossFade(clipName, 0.18f);
+            sebekPlayingClip = clipName;
+        }
+        AnimationState animationState = sebekAnimation[clipName];
+        if (animationState != null)
+            animationState.speed = moving ? (running ? 1.1f : 0.9f) : 0.08f;
+    }
+
+    private void CreateBridgeLight(string name, Vector3 localPosition, Color color, float intensity, float range)
+    {
+        GameObject lightObject = new GameObject(name, typeof(Light));
+        lightObject.transform.SetParent(bridgeRoot, false);
+        lightObject.transform.localPosition = localPosition;
+        Light light = lightObject.GetComponent<Light>();
+        light.type = LightType.Point;
+        light.color = color;
+        light.intensity = intensity;
+        light.range = range;
+        light.shadows = LightShadows.Soft;
     }
 
     private Transform Primitive(PrimitiveType type, string name, Vector3 localPosition, Vector3 localScale, Material material, bool collider = true)
@@ -412,12 +476,8 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
             return;
         if (!controller.initialized)
             controller.TryInitialize();
-        if (!controller.IsInsideBridge && !controller.prototype.IsCommandBridgeGameplayAvailable())
-        {
-            enterBridgeAfterSceneLoad = true;
-            controller.prototype.StartDirectRtsForCommandBridge();
+        if (!controller.prototype.IsCommandBridgeGameplayAvailable())
             return;
-        }
         controller.EnterState(controller.IsInsideBridge ? InternalState.Strategic : InternalState.BridgeThirdPerson);
     }
 
