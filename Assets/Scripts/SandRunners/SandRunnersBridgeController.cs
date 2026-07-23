@@ -4,7 +4,7 @@ using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
 [DefaultExecutionOrder(10000)]
-public sealed class SandRunnersCommandBridgeController : MonoBehaviour
+public sealed partial class SandRunnersCommandBridgeController : MonoBehaviour
 {
     public enum InternalState
     {
@@ -110,7 +110,12 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
         if (keyboard != null && keyboard.hKey.wasPressedThisFrame)
             EnterState(state == InternalState.BridgeHolomap ? InternalState.BridgeThirdPerson : InternalState.BridgeHolomap);
 
-        UpdateThirdPerson(Time.deltaTime);
+        if (state == InternalState.BridgeThirdPerson)
+            UpdateThirdPerson(Time.deltaTime);
+        else if (state == InternalState.BridgeVisor)
+            UpdateBridgeVisor(Time.deltaTime);
+        else if (state == InternalState.BridgeHolomap)
+            UpdateBridgeHolomap(Time.deltaTime);
         UpdateBridgeCamera();
         UpdateStatus();
     }
@@ -172,8 +177,9 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
 
         if (willBeInside)
         {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            bool holomap = next == InternalState.BridgeHolomap;
+            Cursor.lockState = holomap ? CursorLockMode.None : CursorLockMode.Locked;
+            Cursor.visible = holomap;
             UpdateBridgeCamera();
         }
         else if (wasInside)
@@ -182,6 +188,7 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
         }
 
         UpdateStatus();
+        UpdateBridgeModePanels();
     }
 
     private void RestoreStrategicCamera()
@@ -313,13 +320,54 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
             return;
 
         Quaternion orbit = Quaternion.Euler(pitch, yaw, 0f);
+        if (state == InternalState.BridgeVisor)
+        {
+            Vector3 visorPosition = GetPyramidForwardObservationPoint();
+            float relativeYaw = Mathf.DeltaAngle(bridgeRoot.eulerAngles.y, yaw);
+            Quaternion visorAim = Quaternion.LookRotation(bridgeRoot.forward, bridgeRoot.up) *
+                                  Quaternion.Euler(-(pitch - 12f), relativeYaw, 0f);
+            activeCamera.transform.position = Vector3.Lerp(activeCamera.transform.position, visorPosition, 1f - Mathf.Exp(-14f * Time.deltaTime));
+            activeCamera.transform.rotation = Quaternion.Slerp(activeCamera.transform.rotation, visorAim, 1f - Mathf.Exp(-14f * Time.deltaTime));
+            activeCamera.fieldOfView = 34f;
+            return;
+        }
+
         Vector3 target = sebekRoot.position + bridgeRoot.up * 1.25f;
-        Vector3 desired = target - orbit * Vector3.forward *
-                          (state == InternalState.BridgeVisor ? 0.65f : bridgeCameraDistance);
-        desired += bridgeRoot.up * (state == InternalState.BridgeVisor ? 0.1f : 0.45f);
+        Vector3 desired = target - orbit * Vector3.forward * bridgeCameraDistance;
+        desired += bridgeRoot.up * 0.45f;
         activeCamera.transform.position = Vector3.Lerp(activeCamera.transform.position, desired, 1f - Mathf.Exp(-14f * Time.deltaTime));
         activeCamera.transform.rotation = Quaternion.LookRotation(target - activeCamera.transform.position, bridgeRoot.up);
         activeCamera.fieldOfView = state == InternalState.BridgeVisor ? 34f : 62f;
+    }
+
+    private Vector3 GetPyramidForwardObservationPoint()
+    {
+        Renderer[] renderers = prototype.battlePyramid.GetComponentsInChildren<Renderer>(true);
+        bool found = false;
+        Bounds bounds = default;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || renderer.transform.IsChildOf(bridgeRoot))
+                continue;
+            if (!found)
+            {
+                bounds = renderer.bounds;
+                found = true;
+            }
+            else
+                bounds.Encapsulate(renderer.bounds);
+        }
+
+        if (!found)
+            return bridgeRoot.position + bridgeRoot.forward * 24f + bridgeRoot.up * 8f;
+
+        Vector3 forward = bridgeRoot.forward;
+        Vector3 extents = bounds.extents;
+        float projectedRadius = Mathf.Abs(forward.x) * extents.x +
+                                Mathf.Abs(forward.y) * extents.y +
+                                Mathf.Abs(forward.z) * extents.z;
+        return bounds.center + forward * (projectedRadius + 8f) + bridgeRoot.up * (extents.y * 0.35f);
     }
 
     private void BuildCanvas()
@@ -345,6 +393,8 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
         rect.anchorMax = new Vector2(0.8f, 0.99f);
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
+        BuildBridgeVisorUi(canvasObject.transform);
+        BuildBridgeHolomapUi(canvasObject.transform);
     }
 
     private void UpdateStatus()
@@ -479,6 +529,32 @@ public sealed class SandRunnersCommandBridgeController : MonoBehaviour
         if (!controller.prototype.IsCommandBridgeGameplayAvailable())
             return;
         controller.EnterState(controller.IsInsideBridge ? InternalState.Strategic : InternalState.BridgeThirdPerson);
+    }
+
+    public static void DebugEnterBridgeVisorForSmoke()
+    {
+        SandRunnersCommandBridgeController controller = Object.FindFirstObjectByType<SandRunnersCommandBridgeController>();
+        if (controller != null && controller.prototype.IsCommandBridgeGameplayAvailable())
+            controller.EnterState(InternalState.BridgeVisor);
+    }
+
+    public static void DebugEnterBridgeHolomapForSmoke()
+    {
+        SandRunnersCommandBridgeController controller = Object.FindFirstObjectByType<SandRunnersCommandBridgeController>();
+        if (controller != null && controller.prototype.IsCommandBridgeGameplayAvailable())
+            controller.EnterState(InternalState.BridgeHolomap);
+    }
+
+    public static bool DebugRunBridgeMoveIntentForSmoke()
+    {
+        SandRunnersCommandBridgeController controller = Object.FindFirstObjectByType<SandRunnersCommandBridgeController>();
+        return controller != null && controller.prototype.DebugRunCommandBridgeMoveSmoke();
+    }
+
+    public static bool DebugRunBridgeApexForSmoke()
+    {
+        SandRunnersCommandBridgeController controller = Object.FindFirstObjectByType<SandRunnersCommandBridgeController>();
+        return controller != null && controller.prototype.DebugRunCommandBridgeApexSmoke();
     }
 
 }

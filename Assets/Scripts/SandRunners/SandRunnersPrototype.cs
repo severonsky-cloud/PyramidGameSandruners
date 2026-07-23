@@ -1171,6 +1171,9 @@ public partial class SandRunnersPrototype : MonoBehaviour
         nuclearTimer -= dt;
         beamCooldownTimer -= dt;
 
+        if (commandBridgePresentationActive)
+            return;
+
         Mouse mouse = Mouse.current;
         if (gunnerSide == 0 && !apexTargetingMode && !commandCursorMode && mouse != null && !IsStrategicPointerOverUI() && mouse.leftButton.isPressed && autoCannonTimer <= 0f)
         {
@@ -1226,6 +1229,9 @@ public partial class SandRunnersPrototype : MonoBehaviour
 
     private void HandleCameraModeInput()
     {
+        if (commandBridgePresentationActive)
+            return;
+
         if (gunnerSide != 0)
             return;
 
